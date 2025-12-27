@@ -466,9 +466,6 @@ export function EmployeeDashboard({
 
           </CardContent>
         </Card>
-
-<<<<<<< HEAD
-=======
         {/* Performance Chart */}
         <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-md hover:border-gray-300 overflow-hidden">
         <CardHeader className="border-b border-gray-200 bg-white">
@@ -558,7 +555,6 @@ export function EmployeeDashboard({
     </div>
   </CardContent>
 </Card>
->>>>>>> 4a7f191c81d95790c815da9426928774ac8f89f2
 
         {/* Notifications */}
 <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl overflow-hidden group">
