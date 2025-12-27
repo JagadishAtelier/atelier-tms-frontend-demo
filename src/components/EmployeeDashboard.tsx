@@ -569,7 +569,6 @@ export function EmployeeDashboard({
   </CardHeader>
 
   <CardContent className="pt-4">
-    {/* Priority Styles */}
     {(() => {
       const priorityStyles: Record<string, { bg: string; label: string }> = {
         LOW: { bg: "#6B7280", label: "LOW" },       // Gray
@@ -614,7 +613,6 @@ export function EmployeeDashboard({
               key={notification.id}
               className="relative flex justify-between items-start p-4 rounded-xl shadow border border-gray-100 bg-gray-50 hover:shadow-md transition-all"
             >
-              {/* Left content */}
               <div className="flex items-start gap-3">
                 <div className="flex items-center justify-center bg-white p-2 rounded-full shadow-md">
                   {notification.icon}
@@ -634,8 +632,6 @@ export function EmployeeDashboard({
                   </div>
                 </div>
               </div>
-
-              {/* Priority Badge */}
               <span
                 className="absolute top-2 right-2 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow"
                 style={{ backgroundColor: priorityStyles[notification.priority].bg }}
@@ -649,11 +645,23 @@ export function EmployeeDashboard({
     })()}
 
     <Button
-      variant="outline"
-      className="w-full mt-4 border-gray-500 text-gray-900 hover:bg-gray-500 hover:text-white transition-all"
-    >
-      View All Notifications
-    </Button>
+  variant="outline"
+  className="
+    w-full mt-4
+    border-gray-300
+    bg-white
+    text-gray-900
+    hover:bg-white
+    hover:text-gray-900
+    active:bg-white
+    focus:bg-white
+    focus:ring-0
+    transition-all
+  "
+>
+  View All Notifications
+</Button>
+
   </CardContent>
 </Card>
       </div>
