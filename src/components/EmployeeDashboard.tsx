@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Info, AlertTriangle, CheckCircle } from "lucide-react";
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import {
@@ -150,7 +151,7 @@ export function EmployeeDashboard({
   };
 
   return (
-<div className="space-y-6 p-6 bg-white min-h-screen">
+    <div className="space-y-6 p-6 bg-white min-h-screen">
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -180,7 +181,7 @@ export function EmployeeDashboard({
         <CardHeader className="border-b border-[#00B4D8]/20">
           <div className="flex items-center justify-between">
             <CardTitle className="text-gray-900flex items-center gap-2">
-            <Clock className="h-5 w-5 text-gray-700" />
+              <Clock className="h-5 w-5 text-gray-700" />
               Today's Attendance
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -294,7 +295,7 @@ export function EmployeeDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Tasks */}
         <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-        <CardHeader className="border-b border-gray-200 bg-white">
+          <CardHeader className="border-b border-gray-200 bg-white">
             <CardTitle className="text-gray-900 flex items-center gap-2">
               <ListTodo className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
               Today's Tasks
@@ -302,10 +303,10 @@ export function EmployeeDashboard({
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:bg-gray-100">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:bg-gray-100">
                 <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-gray-700" />
+                  <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-gray-700" />
                   </div>
                   <div>
                     <div className="text-gray-900">Pending</div>
@@ -364,7 +365,7 @@ export function EmployeeDashboard({
 
         {/* Performance Chart */}
         <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-        <CardHeader className="border-b border-gray-200 bg-white">
+          <CardHeader className="border-b border-gray-200 bg-white">
             <CardTitle className="text-gray-900 flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
               Weekly Performance
@@ -382,7 +383,7 @@ export function EmployeeDashboard({
                     border: '1px solid #e5e7eb',
                     color: '#111827'
                   }}
-                  
+
                 />
                 <Line
                   type="monotone"
@@ -418,7 +419,7 @@ export function EmployeeDashboard({
 
         {/* Recent Activities */}
         <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-        <CardHeader className="border-b border-gray-200 bg-white">
+          <CardHeader className="border-b border-gray-200 bg-white">
             <CardTitle className="text-gray-900 flex items-center gap-2">
               <Activity className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
               Recent Activities
@@ -448,7 +449,110 @@ export function EmployeeDashboard({
         </Card>
 
         {/* Notifications */}
-        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
+<Card className="bg-white border border-gray-200 shadow-xl rounded-2xl overflow-hidden group">
+  <CardHeader className="border-b border-gray-200 bg-white">
+    <CardTitle className="text-gray-900 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Bell className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
+        Notifications
+      </div>
+      <Badge className="bg-gray-400 text-white">3</Badge>
+    </CardTitle>
+  </CardHeader>
+
+  <CardContent className="pt-4">
+    {/* Priority Styles */}
+    {(() => {
+      const priorityStyles: Record<string, { bg: string; label: string }> = {
+        LOW: { bg: "#6B7280", label: "LOW" },       // Gray
+        HIGH: { bg: "#F59E0B", label: "HIGH" },    // Orange
+        URGENT: { bg: "#EF4444", label: "URGENT" } // Red
+      };
+
+      const notifications = [
+        {
+          id: 1,
+          project: "Website Redesign",
+          time: "10:15 AM",
+          message: "New task assigned",
+          due: "2025-12-30",
+          priority: "HIGH",
+          icon: <Info className="h-5 w-5 text-black" />
+        },
+        {
+          id: 2,
+          project: "Mobile App Launch",
+          time: "Yesterday",
+          message: "Project deadline approaching",
+          due: "2025-12-28",
+          priority: "URGENT",
+          icon: <AlertTriangle className="h-5 w-5 text-black" />
+        },
+        {
+          id: 3,
+          project: "Marketing Campaign",
+          time: "2 days ago",
+          message: "Meeting rescheduled",
+          due: "2026-01-02",
+          priority: "LOW",
+          icon: <CheckCircle className="h-5 w-5 text-black" />
+        }
+      ];
+
+      return (
+        <div className="space-y-4">
+          {notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className="relative flex justify-between items-start p-4 rounded-xl shadow border border-gray-100 bg-gray-50 hover:shadow-md transition-all"
+            >
+              {/* Left content */}
+              <div className="flex items-start gap-3">
+                <div className="flex items-center justify-center bg-white p-2 rounded-full shadow-md">
+                  {notification.icon}
+                </div>
+
+                <div className="flex flex-col">
+                  <p className="text-xs uppercase font-semibold text-gray-500">
+                    {notification.project}
+                  </p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {notification.message}
+                  </p>
+
+                  <div className="flex gap-4 text-xs text-gray-600 mt-1">
+                    <span>Due: {notification.due}</span>
+                    <span>{notification.time}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Priority Badge */}
+              <span
+                className="absolute top-2 right-2 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow"
+                style={{ backgroundColor: priorityStyles[notification.priority].bg }}
+              >
+                {priorityStyles[notification.priority].label}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    })()}
+
+    <Button
+      variant="outline"
+      className="w-full mt-4 border-gray-500 text-gray-900 hover:bg-gray-500 hover:text-white transition-all"
+    >
+      View All Notifications
+    </Button>
+  </CardContent>
+</Card>
+
+
+
+
+        {/* <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
         <CardHeader className="border-b border-gray-200 bg-white">
             <CardTitle className="text-gray-900 flex items-center gap-2">
               <Bell className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
@@ -481,7 +585,7 @@ export function EmployeeDashboard({
               View All Notifications
             </Button>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Productivity Metrics */}
