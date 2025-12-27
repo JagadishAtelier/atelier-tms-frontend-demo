@@ -26,8 +26,8 @@ export function Navbar({ currentUser, notifications, onLogout, onNavigate }: Nav
     <nav className="border-b bg-white px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600">
-            <span className="text-white">AT</span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+            <img src="/Dark_Logo.png" alt="Logo" srcSet="/Dark_Logo.png" className="h-8" />
           </div>
           <div>
             <h1 className="text-blue-600">Atelier Technologies</h1>

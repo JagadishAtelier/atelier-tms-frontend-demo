@@ -54,3 +54,38 @@ export async function resetPasswordApi(
   });
   return res.data;
 }
+
+export const getUsersApi = async (): Promise<User[]> => {
+  const res = await API.get("/");
+  return res.data;
+};
+
+// GET user by ID
+export const getUserByIdApi = async (id: string): Promise<User> => {
+  const res = await API.get(`/${id}`);
+  return res.data;
+};
+
+// CREATE user
+export const createUserApi = async (data: Partial<User>) => {
+  const res = await API.post("/", data);
+  return res.data;
+};
+
+// UPDATE user by ID
+export const updateUserApi = async (id: string, data: Partial<User>) => {
+  const res = await API.put(`/${id}`, data);
+  return res.data;
+};
+
+// Soft Delete User
+export const deleteUserApi = async (id: string) => {
+  const res = await API.delete(`/${id}`);
+  return res.data;
+};
+
+// Restore User
+export const restoreUserApi = async (id: string) => {
+  const res = await API.patch(`/${id}/restore`);
+  return res.data;
+};
