@@ -92,14 +92,7 @@ export function Login({ onLogin, users }: LoginProps) {
                 size="sm"
                 onClick={() => quickLogin('Super Admin')}
               >
-                Super Admin
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => quickLogin('Manager')}
-              >
-                Manager
+              Admin
               </Button>
               <Button
                 variant="outline"
@@ -108,19 +101,12 @@ export function Login({ onLogin, users }: LoginProps) {
               >
                 Employee
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => quickLogin('Client')}
-              >
-                Client
-              </Button>
             </div>
           </div>
 
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-500">
-              Prepared by Atelier Technologies
+              Developed by Atelier Technologies
             </p>
             <p className="text-xs text-gray-500">
               Empowering Businesses through Smart Software Solutions.
