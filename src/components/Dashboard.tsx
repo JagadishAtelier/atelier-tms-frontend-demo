@@ -64,7 +64,7 @@ export function Dashboard({ currentUser, tasks, attendance, onNavigate }: Dashbo
     return a.date === today;
   });
 
-  const myAttendance = todayAttendance.find((a) => a.userId === currentUser.id);
+  const myAttendance = todayAttendance.find((a) => a.userId === currentUser.id || 1);
 
   // Chart data
   const taskStatusData = Object.entries(tasksByStatus).map(([name, value]) => ({
@@ -93,7 +93,7 @@ export function Dashboard({ currentUser, tasks, attendance, onNavigate }: Dashbo
     <div className="space-y-6">
       {/* Welcome Section */}
       <div>
-        <h1>Welcome back, {currentUser.name}!</h1>
+        <h1>Welcome back, {currentUser.username}!</h1>
         <p className="text-gray-500">
           Here's what's happening with your tasks today.
         </p>

@@ -1,4 +1,4 @@
-export type UserRole = 'Super Admin' | 'Admin' | 'Manager' | 'Employee' | 'Client';
+export type UserRole = 'Super Admin' | 'Admin' | 'Manager' | 'employee' | 'Client';
 
 export type TaskStatus = 'To Do' | 'In Progress' | 'Completed' | 'On Hold';
 
@@ -6,7 +6,7 @@ export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email: string;
   role: UserRole;
   department: string;

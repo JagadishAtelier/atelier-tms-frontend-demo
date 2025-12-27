@@ -155,7 +155,7 @@ export function EmployeeDashboard({
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-gray-900">Welcome back, {currentUser.name}!</h1>
+          <h1 className="text-gray-900">Welcome back, {currentUser.username}!</h1>
           <p className="text-gray-400 mt-1">
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>

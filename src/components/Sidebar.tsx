@@ -24,26 +24,26 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, userRole, userDepartment, onNavigate }: SidebarProps) {
   const operationsItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Admin', 'Manager', 'Employee', 'Client'], departments: ['all'] },
-    { id: 'employee-dashboard', label: 'Employee View', icon: LayoutDashboard, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['all'] },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['all'] },
-    { id: 'projects', label: 'Projects', icon: FolderKanban, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['all'] },
-    { id: 'attendance', label: 'Attendance', icon: Clock, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['all'] },
-    { id: 'timetracking', label: 'Time Tracking', icon: Calendar, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['all'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Admin', 'Manager', 'employee', 'Client'], departments: ['all'] },
+    // { id: 'employee-dashboard', label: 'employee View', icon: LayoutDashboard, roles: ['employee'], departments: ['all'] },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['all'] },
+    { id: 'projects', label: 'Projects', icon: FolderKanban, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['all'] },
+    { id: 'attendance', label: 'Attendance', icon: Clock, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['all'] },
+    { id: 'timetracking', label: 'Time Tracking', icon: Calendar, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['all'] },
     { id: 'reports', label: 'Reports', icon: BarChart3, roles: ['Super Admin', 'Admin', 'Manager'], departments: ['all'] },
     { id: 'users', label: 'User Management', icon: Users, roles: ['Super Admin', 'Admin'], departments: ['all'] },
   ];
 
   const crmItems = [
-    { id: 'sales-dashboard', label: 'Sales Dashboard', icon: TrendingUp, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['Sales', 'Management'] },
-    { id: 'leads', label: 'Leads', icon: UserPlus, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['Sales', 'Management'] },
-    { id: 'pipeline', label: 'Pipeline', icon: DollarSign, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['Sales', 'Management'] },
-    { id: 'customers', label: 'Customers', icon: Users, roles: ['Super Admin', 'Admin', 'Manager', 'Employee'], departments: ['Sales', 'Management'] },
+    { id: 'sales-dashboard', label: 'Sales Dashboard', icon: TrendingUp, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['Sales', 'Management'] },
+    { id: 'leads', label: 'Leads', icon: UserPlus, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['Sales', 'Management'] },
+    { id: 'pipeline', label: 'Pipeline', icon: DollarSign, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['Sales', 'Management'] },
+    { id: 'customers', label: 'Customers', icon: Users, roles: ['Super Admin', 'Admin', 'Manager', 'employee'], departments: ['Sales', 'Management'] },
     { id: 'crm-reports', label: 'CRM Reports', icon: BarChart3, roles: ['Super Admin', 'Admin', 'Manager'], departments: ['Sales', 'Management'] },
   ];
 
   const settingsItems = [
-    { id: 'settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Admin', 'Manager', 'Employee', 'Client'], departments: ['all'] },
+    { id: 'settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Admin', 'Manager', 'employee', 'Client'], departments: ['all'] },
   ];
 
   const filterItems = (items: typeof operationsItems) => 

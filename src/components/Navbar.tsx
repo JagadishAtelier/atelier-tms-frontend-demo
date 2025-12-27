@@ -40,7 +40,7 @@ export function Navbar({ currentUser, notifications, onLogout, onNavigate }: Nav
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative p-2">
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
                   <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
@@ -86,13 +86,13 @@ export function Navbar({ currentUser, notifications, onLogout, onNavigate }: Nav
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2">
+              <Button variant="ghost" className="flex items-center gap-2 h-12">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
                   <User className="h-4 w-4 text-blue-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm">{currentUser.name}</p>
-                  <p className="text-xs text-gray-500">{currentUser.role}</p>
+                  <p className="text-sm my-0">{currentUser.username}</p>
+                  <p className="text-xs my-0 text-gray-500">{currentUser.role}</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>

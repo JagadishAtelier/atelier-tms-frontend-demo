@@ -46,8 +46,8 @@ export function UserManagement({ users, departments, currentUser }: UserManageme
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      user.username?.toLowerCase().includes(searchTerm?.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm?.toLowerCase());
     const matchesRole = roleFilter === 'All' || user.role === roleFilter;
     const matchesDepartment =
       departmentFilter === 'All' || user.department === departmentFilter;
@@ -64,7 +64,7 @@ export function UserManagement({ users, departments, currentUser }: UserManageme
         return <Badge variant="default">{role}</Badge>;
       case 'Manager':
         return <Badge variant="secondary">{role}</Badge>;
-      case 'Employee':
+      case 'employee':
         return <Badge variant="outline">{role}</Badge>;
       case 'Client':
         return <Badge>{role}</Badge>;
@@ -84,7 +84,7 @@ export function UserManagement({ users, departments, currentUser }: UserManageme
           <Input
             id="name"
             placeholder="John Doe"
-            defaultValue={user?.name}
+            defaultValue={user?.username}
           />
         </div>
         <div className="space-y-2">
@@ -216,7 +216,7 @@ export function UserManagement({ users, departments, currentUser }: UserManageme
           </CardHeader>
           <CardContent>
             <div className="text-2xl">
-              {users.filter((u) => u.role === 'Employee').length}
+              {users.filter((u) => u.role === 'employee').length}
             </div>
           </CardContent>
         </Card>
@@ -293,7 +293,7 @@ export function UserManagement({ users, departments, currentUser }: UserManageme
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>{user.department}</TableCell>
