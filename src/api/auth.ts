@@ -2,7 +2,7 @@ import axios from "axios";
 import type { User } from "../types";
 
 const API = axios.create({
-  baseURL: "http://172.23.208.1:4000/api/v1/user", // adjust port
+  baseURL: "http://192.168.31.14:4000/api/v1/user", // adjust port
 });
 
 interface LoginResponse {
