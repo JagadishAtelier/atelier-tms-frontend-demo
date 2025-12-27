@@ -10,6 +10,7 @@ import {
 } from './ui/dropdown-menu';
 import { Badge } from './ui/badge';
 import type { User as UserType, Notification } from '../types';
+import MockNotificationButtons from './MockNotificationButtons';
 
 interface NavbarProps {
   currentUser: UserType;
@@ -35,6 +36,7 @@ export function Navbar({ currentUser, notifications, onLogout, onNavigate }: Nav
         </div>
 
         <div className="flex items-center gap-4">
+          {/* <MockNotificationButtons/> */}
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
