@@ -23,7 +23,7 @@ export interface Project {
  * Axios instance
  */
 const API = axios.create({
-  baseURL: "http://192.168.31.14:4000/api/v1/tms/project/project",
+  baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/project/project",
 });
 
 /**
