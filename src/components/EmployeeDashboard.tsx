@@ -150,7 +150,7 @@ export function EmployeeDashboard({
   };
 
   return (
-<div className="space-y-6 p-6 bg-white min-h-screen">
+<div className="space-y-6 p-6 bg-gray-50 min-h-screen">
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -204,13 +204,13 @@ export function EmployeeDashboard({
               ) : (
                 <Button
                   onClick={handleCheckIn}
-                  className="w-full bg-gray-900 text-white hover:bg-gray-800
-                  /90 text-gray-900 transition-all duration-300 hover:scale-105 shadow-lg shadow-[#10b981]/30"
+                  className="w-full bg-[#10b981] hover:bg-[#10b981]/90 text-white transition-all duration-300 hover:scale-105 shadow-lg shadow-[#10b981]/30"
                   disabled={isCheckedIn}
                 >
                   <LogIn className="mr-2 h-4 w-4" />
                   Check In
                 </Button>
+
               )}
             </div>
 
@@ -223,14 +223,15 @@ export function EmployeeDashboard({
               {checkOutTime ? (
                 <div className="text-2xl text-gray-900">{formatTime(checkOutTime)}</div>
               ) : (
-                <Button
+                 <Button
                   onClick={handleCheckOut}
-                  className="w-full bg-gray-900 text-white hover:bg-gray-800/90 text-gray-900 transition-all duration-300 hover:scale-105 shadow-lg shadow-[#ef4444]/30"
+                  className="w-full bg-[#ef4444] hover:bg-[#ef4444]/90 text-white transition-all duration-300 hover:scale-105 shadow-lg shadow-[#ef4444]/30"
                   disabled={!isCheckedIn || !!checkOutTime}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Check Out
                 </Button>
+
               )}
             </div>
 
