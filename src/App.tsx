@@ -31,6 +31,8 @@ import {
   salesActivities,
 } from './lib/mockData';
 import type { User } from './types';
+import { NotificationProvider } from './context/NotificationContext';
+import NotificationPermission from './components/NotificationPermission';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -75,6 +77,8 @@ function App() {
   const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) : null;
 
   return (
+    <NotificationProvider>
+      <NotificationPermission/>
     <div className="flex h-screen flex-col bg-gray-50">
       <Navbar
         currentUser={currentUser}
@@ -216,6 +220,7 @@ function App() {
         </p>
       </footer>
     </div>
+    </NotificationProvider>
   );
 }
 
