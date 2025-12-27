@@ -151,7 +151,7 @@ export function EmployeeDashboard({
   };
 
   return (
-    <div className="space-y-6 p-6 bg-white min-h-screen">
+<div className="space-y-6 p-6 bg-gray-50 min-h-screen">
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -178,15 +178,15 @@ export function EmployeeDashboard({
 
       {/* Attendance Section - First Priority ""*/}
       <Card className="bg-white border border-gray-200 shadow-sm rounded-xl shadow-[#00B4D8]/10 transition-all duration-300 hover:shadow-[#00B4D8]/20">
-        <CardHeader className="border-b border-[#00B4D8]/20">
+      <CardHeader className="border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-gray-900flex items-center gap-2">
-              <Clock className="h-5 w-5 text-gray-700" />
+          <CardTitle className="text-gray-900 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-gray-700" />
               Today's Attendance
             </CardTitle>
             <div className="flex items-center gap-2">
               <div className={`h-3 w-3 rounded-full ${isCheckedIn && !checkOutTime ? 'bg-gray-900   animate-pulse' : 'bg-red-500'}`}></div>
-              <span className="text-sm text-gray-300">
+              <span className="text-sm text-gray-600">
                 {isCheckedIn && !checkOutTime ? 'Active' : 'Checked Out'}
               </span>
             </div>
@@ -205,12 +205,13 @@ export function EmployeeDashboard({
               ) : (
                 <Button
                   onClick={handleCheckIn}
-                  className="w-full bg-gray-900   hover:bg-gray-900  /90 text-gray-900 transition-all duration-300 hover:scale-105 shadow-lg shadow-[#10b981]/30"
+                  className="w-full bg-[#10b981] hover:bg-[#10b981]/90 text-white transition-all duration-300 hover:scale-105 shadow-lg shadow-[#10b981]/30"
                   disabled={isCheckedIn}
                 >
                   <LogIn className="mr-2 h-4 w-4" />
                   Check In
                 </Button>
+
               )}
             </div>
 
@@ -223,14 +224,15 @@ export function EmployeeDashboard({
               {checkOutTime ? (
                 <div className="text-2xl text-gray-900">{formatTime(checkOutTime)}</div>
               ) : (
-                <Button
+                 <Button
                   onClick={handleCheckOut}
-                  className="w-full bg-gray-900   hover:bg-gray-900  /90 text-gray-900 transition-all duration-300 hover:scale-105 shadow-lg shadow-[#ef4444]/30"
+                  className="w-full bg-[#ef4444] hover:bg-[#ef4444]/90 text-white transition-all duration-300 hover:scale-105 shadow-lg shadow-[#ef4444]/30"
                   disabled={!isCheckedIn || !!checkOutTime}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Check Out
                 </Button>
+
               )}
             </div>
 
@@ -294,8 +296,8 @@ export function EmployeeDashboard({
       {/* Dashboard Widgets - 2x2 Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Tasks */}
-        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-          <CardHeader className="border-b border-gray-200 bg-white">
+        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-md hover:border-gray-300 overflow-hidden">
+        <CardHeader className="border-b border-gray-200 bg-white">
             <CardTitle className="text-gray-900 flex items-center gap-2">
               <ListTodo className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
               Today's Tasks
@@ -318,7 +320,7 @@ export function EmployeeDashboard({
 
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:bg-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-[#00B4D8]/10 flex items-center justify-center">
+                <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
                     <PlayCircle className="h-6 w-6 text-gray-900" />
                   </div>
                   <div>
@@ -332,7 +334,7 @@ export function EmployeeDashboard({
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:bg-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-gray-900  /10 flex items-center justify-center">
-                    <CheckCircle2 className="h-6 w-6 text-[#10b981]" />
+                  <CheckCircle2 className="h-6 w-6 text-gray-700" />
                   </div>
                   <div>
                     <div className="text-gray-900">Completed</div>
@@ -343,29 +345,40 @@ export function EmployeeDashboard({
               </div>
 
               {overdueTasks.length > 0 && (
-                <div className="flex items-center justify-between p-4 bg-gray-400/10 rounded-xl border border-[#ef4444]/30">
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="h-6 w-6 text-[#ef4444]" />
-                    <div className="text-gray-900">Overdue Tasks</div>
-                  </div>
-                  <div className="text-2xl text-[#ef4444]">{overdueTasks.length}</div>
-                </div>
-              )}
+  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:bg-gray-100">
+    <div className="flex items-center gap-3">
+      <AlertCircle className="h-6 w-6 text-gray-700" />
+      <div className="text-gray-900">Overdue Tasks</div>
+    </div>
+    <div className="text-2xl text-gray-900">
+      {overdueTasks.length}
+    </div>
+  </div>
+)}
+
             </div>
 
             <Button
-              variant="outline"
-              className="w-full mt-4 border-[#00B4D8] text-gray-900 hover:bg-[#00B4D8] hover:text-gray-900 transition-all"
-              onClick={() => onNavigate('tasks')}
-            >
-              View All Tasks
-            </Button>
+  variant="outline"
+  className="
+    w-full mt-4
+    border-gray-300 text-gray-900
+    hover:bg-gray-100
+    active:bg-gray-200
+    focus:ring-0 focus:ring-offset-0
+    transition-all
+  "
+  onClick={() => onNavigate('tasks')}
+>
+  View All Tasks
+</Button>
+
           </CardContent>
         </Card>
 
         {/* Performance Chart */}
-        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-          <CardHeader className="border-b border-gray-200 bg-white">
+        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-md hover:border-gray-300 overflow-hidden">
+        <CardHeader className="border-b border-gray-200 bg-white">
             <CardTitle className="text-gray-900 flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
               Weekly Performance
@@ -418,35 +431,40 @@ export function EmployeeDashboard({
         </Card>
 
         {/* Recent Activities */}
-        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-          <CardHeader className="border-b border-gray-200 bg-white">
-            <CardTitle className="text-gray-900 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
-              Recent Activities
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              {recentActivities.map((activity) => {
-                const Icon = activity.icon;
-                return (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-4 p-3 bg-[#0A1F44] rounded-xl border border-[#00B4D8]/10 hover:border-[#00B4D8]/30 transition-all hover:translate-x-1"
-                  >
-                    <div className={`h-10 w-10 rounded-full bg-[#122B57] flex items-center justify-center flex-shrink-0`}>
-                      <Icon className={`h-5 w-5 ${activity.color}`} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-gray-900 text-sm">{activity.action}</p>
-                      <p className="text-gray-400 text-xs mt-1">{activity.time}</p>
-                    </div>
-                  </div>
-                );
-              })}
+        <Card className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden">
+  <CardHeader className="border-b border-gray-200 bg-white">
+    <CardTitle className="text-gray-900 flex items-center gap-2">
+      <Activity className="h-5 w-5 text-gray-700" />
+      Recent Activities
+    </CardTitle>
+  </CardHeader>
+
+  <CardContent className="pt-6">
+    <div className="space-y-4">
+      {recentActivities.map((activity) => {
+        const Icon = activity.icon;
+        return (
+          <div
+            key={activity.id}
+            className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:bg-gray-100"
+          >
+            <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+              <Icon className="h-5 w-5 text-gray-700" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex-1">
+              <p className="text-gray-900 text-sm">
+                {activity.action}
+              </p>
+              <p className="text-gray-500 text-xs mt-1">
+                {activity.time}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </CardContent>
+</Card>
 
         {/* Notifications */}
 <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl overflow-hidden group">
@@ -548,75 +566,37 @@ export function EmployeeDashboard({
     </Button>
   </CardContent>
 </Card>
-
-
-
-
-        {/* <Card className="bg-white border border-gray-200 shadow-sm rounded-xl transition-all duration-300 hover:shadow-[#00B4D8]/20 hover:border-[#00B4D8]/50 rounded-2xl overflow-hidden group">
-        <CardHeader className="border-b border-gray-200 bg-white">
-            <CardTitle className="text-gray-900 flex items-center gap-2">
-              <Bell className="h-5 w-5 text-gray-900 group-hover:scale-110 transition-transform" />
-              Notifications
-              <Badge className="bg-gray-400 text-gray-900 ml-2">{notifications.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 rounded-xl border transition-all hover:translate-x-1 ${
-                    notification.type === 'info'
-                      ? 'bg-[#00B4D8]/10 border-[#00B4D8]/30'
-                      : notification.type === 'warning'
-                      ? 'bg-[#f59e0b]/10 border-[#f59e0b]/30'
-                      : 'bg-gray-900/10 border-[#10b981]/30'
-                  }`}
-                >
-                  <p className="text-gray-900 text-sm">{notification.message}</p>
-                  <p className="text-gray-400 text-xs mt-2">{notification.time}</p>
-                </div>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              className="w-full mt-4 border-[#00B4D8] text-gray-900 hover:bg-[#00B4D8] hover:text-gray-900 transition-all"
-            >
-              View All Notifications
-            </Button>
-          </CardContent>
-        </Card> */}
       </div>
 
       {/* Productivity Metrics */}
       <Card className="bg-white border border-gray-200 shadow-sm rounded-xl">
-        <CardHeader className="border-b border-[#00B4D8]/20">
-          <CardTitle className="text-gray-900 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-gray-900" />
-            Productivity Insights
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-[#0A1F44] p-6 rounded-xl border border-[#00B4D8]/20 text-center">
-              <div className="text-3xl text-gray-90 mb-2">92%</div>
-              <div className="text-gray-400 text-sm">Task Completion Rate</div>
-            </div>
-            <div className="bg-[#0A1F44] p-6 rounded-xl border border-[#10b981]/20 text-center">
-              <div className="text-3xl text-[#10b981] mb-2">37.5h</div>
-              <div className="text-gray-400 text-sm">This Week</div>
-            </div>
-            <div className="bg-[#0A1F44] p-6 rounded-xl border border-[#f59e0b]/20 text-center">
-              <div className="text-3xl text-[#f59e0b] mb-2">4.2h</div>
-              <div className="text-gray-400 text-sm">Avg. Task Duration</div>
-            </div>
-            <div className="bg-[#0A1F44] p-6 rounded-xl border border-[#3b82f6]/20 text-center">
-              <div className="text-3xl text-[#3b82f6] mb-2">28</div>
-              <div className="text-gray-400 text-sm">Tasks This Month</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  <CardHeader className="border-b border-gray-200">
+    <CardTitle className="text-gray-900 flex items-center gap-2">
+      <TrendingUp className="h-5 w-5 text-gray-700" />
+      Productivity Insights
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="pt-6">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 text-center">
+        <div className="text-3xl text-gray-900 mb-2">92%</div>
+        <div className="text-gray-500 text-sm">Task Completion Rate</div>
+      </div>
+      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 text-center">
+        <div className="text-3xl text-gray-900 mb-2">37.5h</div>
+        <div className="text-gray-500 text-sm">This Week</div>
+      </div>
+      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 text-center">
+        <div className="text-3xl text-gray-900 mb-2">4.2h</div>
+        <div className="text-gray-500 text-sm">Avg. Task Duration</div>
+      </div>
+      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 text-center">
+        <div className="text-3xl text-gray-900 mb-2">28</div>
+        <div className="text-gray-500 text-sm">Tasks This Month</div>
+      </div>
+    </div>
+  </CardContent>
+</Card>
     </div>
   );
 }
