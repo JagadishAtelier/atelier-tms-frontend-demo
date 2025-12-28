@@ -79,13 +79,13 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Role</Label>
-            <Select defaultValue={user?.role || 'Employee'}>
+            <Select defaultValue={user?.role || 'employee'}>
               <SelectTrigger id="role"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {currentUser.role === 'Super Admin' && <SelectItem value="Super Admin">Super Admin</SelectItem>}
                 <SelectItem value="Admin">Admin</SelectItem>
                 <SelectItem value="Manager">Manager</SelectItem>
-                <SelectItem value="Employee">Employee</SelectItem>
+                <SelectItem value="employee">Employee</SelectItem>
                 <SelectItem value="Client">Client</SelectItem>
               </SelectContent>
             </Select>
