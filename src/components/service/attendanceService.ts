@@ -44,7 +44,7 @@ export interface Attendance {
  * Supports action/time, check_in/check_out, or check_time array
  */
 export type CreateAttendancePayload = {
-  employee_id: string;
+  employee_id?: string;
   date: string; 
   action?: "check_in" | "check_out" | "sign_in" | "sign_out";
   time?: string;

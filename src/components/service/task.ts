@@ -8,6 +8,7 @@ export interface TaskPayload {
   due_date_and_time?: string | Date;
   start_date?: string | Date;
   end_date?: string | Date;
+  notes?: string;
   project_id: string; // UUID
   assigned_to: string; // UUID (single employee)
   status?: "Not Started" | "In Progress" | "Completed" | "On Hold" | "Cancelled";
@@ -21,6 +22,7 @@ export interface Task extends TaskPayload {
   updatedAt: string;
   timeSpent?: number;
   estimatedTime?: number;
+  notes?: string;
   tags?: string[];
   subtasks?: { id: string; title: string; completed: boolean }[];
   comments?: {

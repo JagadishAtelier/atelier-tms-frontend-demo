@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Info, AlertTriangle, CheckCircle } from "lucide-react";
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { updateTaskApi } from "../components/service/task";
 import {
   Clock,
   LogIn,
@@ -60,6 +61,15 @@ export function EmployeeDashboard({
   const [breakStartTime, setBreakStartTime] = useState<Date | null>(null);
   const [showCheckoutReminder, setShowCheckoutReminder] = useState(false);
   const [loadingToday, setLoadingToday] = useState(false);
+
+  // --- New state for pending task notes modal ---
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskNotesInput, setTaskNotesInput] = useState('');
+  const [taskUpdateLoading, setTaskUpdateLoading] = useState(false);
+  const [taskUpdateError, setTaskUpdateError] = useState<string | null>(null);
+  const [taskUpdateSuccess, setTaskUpdateSuccess] = useState<string | null>(null);
+  const [signOutRetrying, setSignOutRetrying] = useState(false); // ensure single retry
 
   // ---------- Helpers ----------
 
@@ -154,31 +164,95 @@ export function EmployeeDashboard({
         setTotalHours(0);
         setShowCheckoutReminder(false);
         setIsOnBreak(false);
+        setBreakStartTime(null);
         return;
       }
 
       // Parse sign-in / sign-out or check_time
       const dateOnly = att.date ?? todayDateString();
 
-      // sign_in / sign_out often available
-      const signInDate = parseTimeToDate(dateOnly, att.sign_in ?? (Array.isArray(att.check_time) ? att.check_time[0]?.check_in : undefined));
-      let signOutDate: Date | null = null;
-      if (Array.isArray(att.check_time)) {
-        // get latest check_out
-        for (const e of att.check_time) {
-          if (e?.check_out) {
-            const d = parseTimeToDate(dateOnly, e.check_out);
-            if (d && (!signOutDate || d.getTime() > signOutDate.getTime())) signOutDate = d;
-          }
-        }
-      }
-      if (!signOutDate && att.sign_out) signOutDate = parseTimeToDate(dateOnly, att.sign_out);
+      // Attempt to find the last check_time entry
+      const lastEntry: CheckTime | undefined =
+        Array.isArray(att.check_time) && att.check_time.length > 0
+          ? att.check_time[att.check_time.length - 1]
+          : undefined;
 
-      setCheckInTime(signInDate);
+      // Default signInDate prefers att.sign_in, fallback to first check_time check_in
+      const signInDate = parseTimeToDate(
+        dateOnly,
+        att.sign_in ?? (Array.isArray(att.check_time) ? att.check_time[0]?.check_in : undefined)
+      );
+
+      // New logic:
+      // - If att.sign_out exists => user signed out
+      // - Else if lastEntry exists:
+      //     - if lastEntry has only check_in (no check_out) => user is currently checked in (resumed)
+      //     - if lastEntry has check_out (and sign_out is null) => user is on break (break started at that check_out)
+      // - Else => fallback (no out time)
+      let signOutDate: Date | null = null;
+      let onBreak = false;
+      let breakStart: Date | null = null;
+      let effectiveCheckIn: Date | null = signInDate;
+
+      if (att.sign_out) {
+        // explicit sign_out from server -> user fully signed out
+        signOutDate = parseTimeToDate(dateOnly, att.sign_out);
+        onBreak = false;
+        breakStart = null;
+        // effectiveCheckIn remains signInDate (server provided)
+      } else if (lastEntry) {
+        // examine last entry
+        if (lastEntry.check_in && !lastEntry.check_out) {
+          // last entry is a pure check_in -> treated as current active check_in (resumed)
+          const resumed = parseTimeToDate(dateOnly, lastEntry.check_in);
+          if (resumed) effectiveCheckIn = resumed;
+          signOutDate = null;
+          onBreak = false;
+          breakStart = null;
+        } else if (lastEntry.check_out && !lastEntry.check_in) {
+          // last entry is pure check_out (rare) -> treat as break start
+          const out = parseTimeToDate(dateOnly, lastEntry.check_out);
+          if (out) {
+            signOutDate = out;
+            onBreak = true;
+            breakStart = out;
+            // effectiveCheckIn remains signInDate (if available)
+          }
+        } else if (lastEntry.check_out && lastEntry.check_in) {
+          // last entry has both; if it's the final entry with both, user might have closed a session,
+          // but since att.sign_out is null, we treat lastEntry.check_out as potential break start only if it's the final moment.
+          // We'll treat it as break start (consistent with earlier logic).
+          const out = parseTimeToDate(dateOnly, lastEntry.check_out);
+          if (out) {
+            signOutDate = out;
+            onBreak = true;
+            breakStart = out;
+          }
+        } else {
+          // fallback: no info
+          signOutDate = null;
+          onBreak = false;
+          breakStart = null;
+        }
+      } else {
+        // no check_time entries: nothing to show
+        signOutDate = null;
+        onBreak = false;
+        breakStart = null;
+      }
+
+      // Apply to state:
+      setCheckInTime(effectiveCheckIn);
       setCheckOutTime(signOutDate);
-      setIsCheckedIn(!!signInDate && !signOutDate);
+      setIsOnBreak(onBreak);
+      setBreakStartTime(breakStart);
+      // If user has sign_in (or resumed) and no final sign_out and not on break, they are active
+      setIsCheckedIn(!!effectiveCheckIn && !signOutDate && !onBreak);
+      // compute hours from server-provided data or fallback
       setTotalHours(computeHoursFromAttendance(att));
-      setShowCheckoutReminder(!!signInDate && !signOutDate && computeHoursFromAttendance(att) > 9);
+      // don't show checkout reminder while on break
+      setShowCheckoutReminder(!onBreak && !!effectiveCheckIn && !signOutDate && computeHoursFromAttendance(att) > 9);
+
     } catch (err) {
       console.error('Failed to load today attendance', err);
     } finally {
@@ -228,15 +302,52 @@ export function EmployeeDashboard({
     }
   }, [currentTime, checkInTime, checkOutTime]);
 
+  // ---------- Error parsing helper ----------
+  const extractPendingTaskIdFromError = (err: any): string | null => {
+    // many axios/fetch shapes => check multiple places
+    try {
+      // axios style: err.response.data.pendingTask.id
+      if (err?.response?.data?.pendingTask?.id) return String(err.response.data.pendingTask.id);
+
+      // axios style: err.response.data.message includes ID
+      const msg1 = err?.response?.data?.message || err?.response?.data?.msg || null;
+      if (typeof msg1 === 'string') {
+        const m = msg1.match(/Pending Task ID[:\s]*([0-9a-fA-F-]{8,36})/i);
+        if (m) return m[1];
+      }
+
+      // direct thrown Error with message
+      const msg2 = err?.message || err;
+      if (typeof msg2 === 'string') {
+        const m2 = msg2.match(/Pending Task ID[:\s]*([0-9a-fA-F-]{8,36})/i);
+        if (m2) return m2[1];
+      }
+
+      // sometimes server returns { message: '...ID: <id>' }
+      const msg3 = err?.data?.message || err?.data?.msg;
+      if (typeof msg3 === 'string') {
+        const m3 = msg3.match(/Pending Task ID[:\s]*([0-9a-fA-F-]{8,36})/i);
+        if (m3) return m3[1];
+      }
+    } catch (e) {
+      // ignore parsing errors
+    }
+    return null;
+  };
+
   // ---------- Action handlers (call API) ----------
+  // NOTE: According to your request:
+  // - Click "Check In" => send action: "sign_in"
+  // - Click "Check Out" => send action: "sign_out"
+  // - "Start Break" => send action: "check_out" (marks break start by checking out)
+  // - "End Break" => send action: "check_in" (resumes by checking in)
+  // Also: do NOT send employee_id; backend will use token to determine the employee.
 
   const handleCheckIn = async () => {
     try {
-      // call API to create attendance entry (server will record time if not provided)
       const payload = {
-        employee_id: currentUser.id,
         date: todayDateString(),
-        action: 'check_in' as const,
+        action: 'sign_in' as const, // backend will use token to get employee
       };
       const res = await createAttendanceApi(payload);
       const att = normalizeResponseToAttendance(res);
@@ -247,13 +358,17 @@ export function EmployeeDashboard({
         setIsCheckedIn(!!parsed && !att.sign_out);
         setTotalHours(computeHoursFromAttendance(att));
         setShowCheckoutReminder(computeHoursFromAttendance(att) > 9 && !att.sign_out);
+        // If we signed in after a break end, ensure break state cleared
+        setIsOnBreak(false);
+        setBreakStartTime(null);
       } else {
-        // fallback: set local check-in time
         const now = new Date();
         setCheckInTime(now);
         setIsCheckedIn(true);
         setCheckOutTime(null);
         setTotalHours(0);
+        setIsOnBreak(false);
+        setBreakStartTime(null);
       }
     } catch (err: any) {
       console.error('Check-in failed', err);
@@ -261,12 +376,12 @@ export function EmployeeDashboard({
     }
   };
 
-  const handleCheckOut = async () => {
+  // central sign-out function with optional modal showing
+  const doSignOut = async (allowShowModal = true): Promise<void> => {
     try {
       const payload = {
-        employee_id: currentUser.id,
         date: todayDateString(),
-        action: 'check_out' as const,
+        action: 'sign_out' as const,
       };
       const res = await createAttendanceApi(payload);
       const att = normalizeResponseToAttendance(res);
@@ -278,31 +393,183 @@ export function EmployeeDashboard({
         setIsCheckedIn(!!parsedSignIn && !parsedSignOut);
         setTotalHours(computeHoursFromAttendance(att));
         setShowCheckoutReminder(false);
+        // sign_out ends any break state
         setIsOnBreak(false);
         setBreakStartTime(null);
+        // clear any pending modal state
+        setPendingTaskId(null);
+        setShowTaskModal(false);
+        setTaskUpdateError(null);
+        setTaskUpdateSuccess(null);
       } else {
-        // fallback local
         const now = new Date();
         setCheckOutTime(now);
         setIsCheckedIn(false);
         setIsOnBreak(false);
         setShowCheckoutReminder(false);
+        setBreakStartTime(null);
       }
     } catch (err: any) {
       console.error('Check-out failed', err);
-      alert(err?.message || 'Failed to check out');
+
+      // try to extract pending task id
+      const id = extractPendingTaskIdFromError(err);
+
+      // if we found a pending task id and allowed to show modal, open modal to update notes
+      if (id && allowShowModal && !signOutRetrying) {
+        setPendingTaskId(id);
+        // try to prefill existing notes from tasks prop if present
+        const localTask = tasks?.find((t: any) => String(t.id) === String(id));
+        setTaskNotesInput(localTask?.notes ?? '');
+        setTaskUpdateError(null);
+        setTaskUpdateSuccess(null);
+        setShowTaskModal(true);
+        return;
+      }
+
+      // fallback alert using possible server message
+      const serverMsg =
+        err?.response?.data?.message || err?.response?.data?.msg || err?.data?.message || err?.message;
+      alert(serverMsg || 'Your Task due today is not completed');
     }
   };
 
-  const handleBreakStart = () => {
-    setIsOnBreak(true);
-    setBreakStartTime(new Date());
+  const handleCheckOut = async () => {
+    // call central function allowing modal
+    await doSignOut(true);
   };
 
-  const handleBreakEnd = () => {
-    setIsOnBreak(false);
-    setBreakStartTime(null);
+  const handleBreakStart = async () => {
+    try {
+      // Start break: treat as a check_out action
+      const payload = {
+        date: todayDateString(),
+        action: 'check_out' as const, // backend will use token to get employee
+      };
+      const res = await createAttendanceApi(payload);
+      const att = normalizeResponseToAttendance(res);
+      if (att) {
+        // On break start we expect a sign_out or a last check_out recorded
+        // derive break start time from latest check_out or sign_out
+        let breakTime: Date | null = null;
+        if (att.sign_out) breakTime = parseTimeToDate(att.date ?? todayDateString(), att.sign_out);
+        else if (Array.isArray(att.check_time)) {
+          // take last check_out
+          for (const e of (att.check_time as CheckTime[])) {
+            if (e?.check_out) {
+              const d = parseTimeToDate(att.date ?? todayDateString(), e.check_out);
+              if (d && (!breakTime || d.getTime() > breakTime.getTime())) breakTime = d;
+            }
+          }
+        }
+        setIsOnBreak(true);
+        setBreakStartTime(breakTime ?? new Date());
+        // update checkOutTime to show user is checked out for break
+        setCheckOutTime(breakTime ?? new Date());
+        // set checkedIn state accordingly
+        setIsCheckedIn(false);
+        setTotalHours(computeHoursFromAttendance(att));
+        setShowCheckoutReminder(false);
+      } else {
+        const now = new Date();
+        setIsOnBreak(true);
+        setBreakStartTime(now);
+        setCheckOutTime(now);
+        setIsCheckedIn(false);
+        setShowCheckoutReminder(false);
+      }
+    } catch (err: any) {
+      console.error('Start break failed', err);
+      alert(err?.message || 'Failed to start break');
+    }
   };
+
+  const handleBreakEnd = async () => {
+    try {
+      // End break: treat as a check_in action
+      const payload = {
+        date: todayDateString(),
+        action: 'check_in' as const, // backend will use token to get employee
+      };
+      const res = await createAttendanceApi(payload);
+      const att = normalizeResponseToAttendance(res);
+      if (att) {
+        // On break end we expect a new sign_in or a last check_in recorded
+        let resumedAt: Date | null = null;
+        if (att.sign_in) resumedAt = parseTimeToDate(att.date ?? todayDateString(), att.sign_in);
+        else if (Array.isArray(att.check_time)) {
+          // take last check_in
+          for (const e of (att.check_time as CheckTime[])) {
+            if (e?.check_in) {
+              const d = parseTimeToDate(att.date ?? todayDateString(), e.check_in);
+              if (d && (!resumedAt || d.getTime() > resumedAt.getTime())) resumedAt = d;
+            }
+          }
+        }
+        setIsOnBreak(false);
+        setBreakStartTime(null);
+        // update checkInTime if resumedAt exists
+        if (resumedAt) setCheckInTime(resumedAt);
+        // clear checkOutTime because user resumed
+        setCheckOutTime(null);
+        setIsCheckedIn(!!resumedAt && true);
+        setTotalHours(computeHoursFromAttendance(att));
+        setShowCheckoutReminder(computeHoursFromAttendance(att) > 9 && !att.sign_out);
+      } else {
+        const now = new Date();
+        setIsOnBreak(false);
+        setBreakStartTime(null);
+        setCheckInTime(now);
+        setCheckOutTime(null);
+        setIsCheckedIn(true);
+        setTotalHours(0);
+      }
+    } catch (err: any) {
+      console.error('End break failed', err);
+      alert(err?.message || 'Failed to end break');
+    }
+  };
+
+  // ---------- Task notes update flow ----------
+  // Tries to PATCH /api/v1/task/:id with { notes } — adjust endpoint if your backend differs.
+  const updateTaskNotes = async (id: string, notes: string) => {
+  setTaskUpdateLoading(true);
+  setTaskUpdateError(null);
+  setTaskUpdateSuccess(null);
+
+  try {
+    await updateTaskApi(id, { notes }); // ✅ using task.ts
+
+    setTaskUpdateSuccess("Notes updated successfully.");
+
+    // close modal and retry sign-out
+    setTimeout(() => {
+      setShowTaskModal(false);
+      setPendingTaskId(null);
+      setTaskUpdateLoading(false);
+      setTaskUpdateError(null);
+
+      // retry sign-out once
+      if (!signOutRetrying) {
+        setSignOutRetrying(true);
+        doSignOut(false).finally(() => setSignOutRetrying(false));
+      }
+    }, 700);
+
+  } catch (err: any) {
+    console.error("Failed to update task notes", err);
+
+    const serverMsg =
+      err?.response?.data?.message ||
+      err?.response?.data?.msg ||
+      err?.message ||
+      "Failed to update task notes";
+
+    setTaskUpdateError(serverMsg);
+    setTaskUpdateLoading(false);
+  }
+};
+
 
   // ---------- Helper for display time ----------
   const formatTime = (date: Date | null) => {
@@ -384,7 +651,7 @@ export function EmployeeDashboard({
             <div className="flex items-center gap-2">
               <div className={`h-3 w-3 rounded-full ${isCheckedIn && !checkOutTime ? 'bg-gray-900 animate-pulse' : 'bg-red-500'}`}></div>
               <span className="text-sm text-gray-600">
-                {isCheckedIn && !checkOutTime ? 'Active' : 'Checked Out'}
+                {isOnBreak ? 'On Break' : (isCheckedIn && !checkOutTime ? 'Active' : 'Checked Out')}
               </span>
             </div>
           </div>
@@ -818,6 +1085,57 @@ export function EmployeeDashboard({
           </div>
         </CardContent>
       </Card>
+
+      {/* ---------------- Task Notes Modal ---------------- */}
+      {showTaskModal && pendingTaskId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <div className="fixed inset-0 bg-black/40" onClick={() => setShowTaskModal(false)} />
+          <div className="relative w-full max-w-xl bg-white rounded-xl shadow-lg p-6 z-10">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Pending Task — Notes required</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              You have a pending task that blocks sign-out. Update the task notes to mark progress (Task ID: <span className="font-mono">{pendingTaskId}</span>).
+            </p>
+
+            <label className="text-xs text-gray-500">Notes</label>
+            <textarea
+              value={taskNotesInput}
+              onChange={(e) => setTaskNotesInput(e.target.value)}
+              rows={6}
+              className="w-full mt-2 p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
+              placeholder="Describe work done / reason why it's not completed..."
+            />
+
+            {taskUpdateError && <div className="text-sm text-red-600 mt-2">{taskUpdateError}</div>}
+            {taskUpdateSuccess && <div className="text-sm text-green-600 mt-2">{taskUpdateSuccess}</div>}
+
+            <div className="flex items-center justify-end gap-3 mt-4">
+              <Button
+                variant="ghost"
+                className="text-gray-700"
+                onClick={() => {
+                  setShowTaskModal(false);
+                  setPendingTaskId(null);
+                }}
+                disabled={taskUpdateLoading}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                onClick={() => updateTaskNotes(pendingTaskId, taskNotesInput)}
+                className="bg-[#10b981] hover:bg-[#10b981]/95 text-white"
+                disabled={taskUpdateLoading || taskNotesInput.trim().length === 0}
+              >
+                {taskUpdateLoading ? 'Updating...' : 'Update Notes & Retry Sign Out'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
