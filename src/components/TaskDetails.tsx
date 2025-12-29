@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -19,18 +19,115 @@ import {
   Pause,
   Paperclip,
 } from 'lucide-react';
-import type { Task, User as UserType } from '../types';
+import type { Task, User as UserType, TaskStatus, TaskPriority } from '../types';
+import { getTaskByIdApi } from './service/task';
 
 interface TaskDetailsProps {
-  task: Task;
+  task?: Task;
+  taskId?: string;
   users: UserType[];
   currentUser: UserType;
   onBack: () => void;
 }
 
-export function TaskDetails({ task, users, currentUser, onBack }: TaskDetailsProps) {
+export function TaskDetails({ task: propTask, taskId, users, currentUser, onBack }: TaskDetailsProps) {
+  const [task, setTask] = useState<Task | null>(propTask || null);
+  const [loading, setLoading] = useState(!propTask);
   const [newComment, setNewComment] = useState('');
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  // Fetch task if only taskId is provided
+  useEffect(() => {
+    if (taskId && !propTask) {
+      fetchTask();
+    }
+  }, [taskId]);
+
+  async function fetchTask() {
+    if (!taskId) return;
+    setLoading(true);
+    try {
+      const res = await getTaskByIdApi(taskId);
+      const taskData = (res.data as any)?.data || res.data;
+      
+      // Map API task to frontend Task type (same mapping as TaskBoard)
+      const statusMap: Record<string, TaskStatus> = {
+        'Not Started': 'To Do',
+        'In Progress': 'In Progress',
+        'On Hold': 'On Hold',
+        'Completed': 'Completed',
+        'Cancelled': 'On Hold'
+      };
+      const priorityMap: Record<string, TaskPriority> = {
+        'Low': 'Low',
+        'Medium': 'Medium',
+        'High': 'High',
+        'Urgent': 'Urgent'
+      };
+      
+      const parseTimeToHours = (timeString: string): number | undefined => {
+        if (!timeString) return undefined;
+        try {
+          const parts = timeString.split(':');
+          if (parts.length === 3) {
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            const seconds = parseInt(parts[2], 10);
+            return hours + (minutes / 60) + (seconds / 3600);
+          }
+          return parseFloat(timeString);
+        } catch {
+          return undefined;
+        }
+      };
+
+      const mappedTask: Task = {
+        id: taskData.id,
+        title: taskData.title || '',
+        description: taskData.description || '',
+        status: taskData.status ? (statusMap[taskData.status] || 'To Do') : 'To Do',
+        priority: taskData.priority ? (priorityMap[taskData.priority] || 'Medium') : 'Medium',
+        assignedTo: taskData.assigned_to ? [taskData.assigned_to] : [],
+        assignedBy: taskData.created_by || currentUser.id,
+        createdAt: taskData.createdAt || new Date().toISOString(),
+        dueDate: taskData.due_date_and_time || taskData.dueDate || new Date().toISOString(),
+        project: taskData.project?.name || taskData.project_id || '',
+        department: taskData.department || '',
+        tags: taskData.tags || [],
+        timeSpent: taskData.timeSpent || (taskData.timetaken ? parseTimeToHours(taskData.timetaken) : undefined),
+        estimatedTime: taskData.estimatedTime,
+        subtasks: taskData.subtasks,
+        attachments: taskData.attachments,
+        comments: taskData.comments
+      };
+      setTask(mappedTask);
+    } catch (error) {
+      console.error('Failed to fetch task:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-gray-500">Loading task details...</p>
+      </div>
+    );
+  }
+
+  if (!task) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-500">Task not found</p>
+        </div>
+      </div>
+    );
+  }
 
   const assignedUsers = task.assignedTo
     .map((id) => users.find((u) => u.id === id))
@@ -285,10 +382,10 @@ export function TaskDetails({ task, users, currentUser, onBack }: TaskDetailsPro
                     <div key={user.id} className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="text-xs">
-                          {user.name.split(' ').map((n) => n[0]).join('')}
+                          {user.username.split(' ').map((n) => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm">{user.name}</span>
+                      <span className="text-sm">{user.username}</span>
                     </div>
                   ))}
                 </div>
@@ -301,7 +398,7 @@ export function TaskDetails({ task, users, currentUser, onBack }: TaskDetailsPro
                   <User className="h-4 w-4" />
                   <span>Created By</span>
                 </div>
-                <p className="text-sm">{createdByUser?.name}</p>
+                <p className="text-sm">{createdByUser?.username || 'Unknown'}</p>
               </div>
 
               <Separator />

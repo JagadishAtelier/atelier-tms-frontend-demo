@@ -26,7 +26,7 @@ import {
   updateUserApi,
   deleteUserApi,
   restoreUserApi
-} from "../api/auth";
+} from "./service/auth";
 
 
 export function UserManagement({ departments, currentUser }: { departments: Department[], currentUser: User }) {
@@ -117,7 +117,8 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
               const formData = {
                 username: (document.getElementById("name") as HTMLInputElement)?.value,
                 email: (document.getElementById("email") as HTMLInputElement)?.value,
-                role: document.querySelector("#role div")?.textContent || user?.role,
+                role: (document.getElementById("role") as HTMLButtonElement)?.value
+                  || user?.role,
                 department: document.querySelector("#department div")?.textContent || user?.department,
                 password: !user ? (document.getElementById("password") as HTMLInputElement)?.value : undefined,
               };

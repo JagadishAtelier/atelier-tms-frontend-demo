@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
-import { loginApi, forgotPasswordApi, resetPasswordApi } from "../api/auth";
+import { loginApi, forgotPasswordApi, resetPasswordApi } from "./service/auth";
 import type { User } from "../types";
 
 interface LoginProps {

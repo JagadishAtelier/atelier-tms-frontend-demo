@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -29,6 +29,16 @@ import {
   Clock,
 } from 'lucide-react';
 import type { Task, User as UserType, TaskStatus, TaskPriority } from '../types';
+import {
+  getTasksApi,
+  createTaskApi,
+  updateTaskApi,
+  deleteTaskApi,
+  restoreTaskApi,
+  type TaskPayload
+} from "./service/task";
+import { getProjectsApi, type Project } from "./service/projectService";
+import { getEmployeesApi, type Employee } from "./service/employeeService";
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -44,9 +54,130 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
   const [departmentFilter, setDepartmentFilter] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [localTasks, setLocalTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  // Create task form state
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    description: '',
+    priority: 'Medium' as TaskPriority,
+    dueDate: '',
+    department: '',
+    projectId: '', // Store project ID
+    projectName: '', // Store project name for display
+    assignedTo: '', // Store single employee ID
+    status: 'Not Started' as TaskStatus
+  });
+
+  // Fetch tasks on mount
+  useEffect(() => { 
+    fetchTasks(); 
+    fetchProjects();
+    fetchEmployees();
+  }, []);
+
+  async function fetchTasks() {
+    setLoading(true);
+    try {
+      const res = await getTasksApi();
+      // Handle nested response structure: data.data.data
+      const responseData = (res.data as any)?.data || res.data;
+      const fetchedTasks = responseData?.data || responseData || [];
+      const tasksArray = Array.isArray(fetchedTasks) ? fetchedTasks : [];
+      
+      // Map API tasks to match the expected Task type
+      const mappedTasks: Task[] = tasksArray.map((task: any) => {
+        // Map status: null -> 'To Do', or map backend status to frontend status
+        const statusMap: Record<string, TaskStatus> = {
+          'Not Started': 'To Do',
+          'In Progress': 'In Progress',
+          'On Hold': 'On Hold',
+          'Completed': 'Completed',
+          'Cancelled': 'On Hold' // Map cancelled to On Hold for frontend
+        };
+        const frontendStatus = task.status 
+          ? (statusMap[task.status] || 'To Do')
+          : 'To Do';
+        
+        // Map priority: null -> 'Medium'
+        const priorityMap: Record<string, TaskPriority> = {
+          'Low': 'Low',
+          'Medium': 'Medium',
+          'High': 'High',
+          'Urgent': 'Urgent'
+        };
+        const frontendPriority = task.priority 
+          ? (priorityMap[task.priority] || 'Medium')
+          : 'Medium';
+        
+        return {
+          id: task.id,
+          title: task.title || '',
+          description: task.description || '',
+          status: frontendStatus,
+          priority: frontendPriority,
+          assignedTo: task.assigned_to ? [task.assigned_to] : [], // Convert single ID to array
+          assignedBy: task.created_by || currentUser.id,
+          createdAt: task.createdAt || new Date().toISOString(),
+          dueDate: task.due_date_and_time || task.dueDate || new Date().toISOString(),
+          project: task.project?.name || task.project_id || '',
+          department: task.department || '', // May not be in API response
+          tags: task.tags || [],
+          timeSpent: task.timeSpent || (task.timetaken ? parseTimeToHours(task.timetaken) : undefined),
+          estimatedTime: task.estimatedTime,
+          subtasks: task.subtasks,
+          attachments: task.attachments,
+          comments: task.comments
+        };
+      });
+      console.log('Fetched tasks:', mappedTasks.length, mappedTasks);
+      setLocalTasks(mappedTasks);
+    } catch (error) {
+      console.error('Failed to fetch tasks:', error);
+      setLocalTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchProjects() {
+    try {
+      const res = await getProjectsApi();
+      const projectsArray = Array.isArray(res) ? res :
+        Array.isArray(res.data) ? res.data :
+          Array.isArray(res.data?.data) ? res.data.data : [];
+      setProjects(projectsArray);
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+      setProjects([]);
+    }
+  }
+
+  async function fetchEmployees() {
+    try {
+      const res = await getEmployeesApi();
+      // Handle nested response structure similar to tasks
+      const responseData = (res as any)?.data || res;
+      const employeesArray = responseData?.data || responseData || [];
+      const finalArray = Array.isArray(employeesArray) ? employeesArray : [];
+      console.log('Fetched employees:', finalArray.length, finalArray);
+      setEmployees(finalArray);
+    } catch (error) {
+      console.error('Failed to fetch employees:', error);
+      setEmployees([]);
+    }
+  }
+
+  // Use localTasks if available, otherwise fall back to prop
+  const tasksToUse = Array.isArray(localTasks) && localTasks.length > 0 
+    ? localTasks 
+    : (Array.isArray(tasks) ? tasks : []);
 
   // Filter tasks based on user role and filters
-  let filteredTasks = tasks.filter((task) => {
+  let filteredTasks = tasksToUse.filter((task) => {
     if (currentUser.role === 'Super Admin' || currentUser.role === 'Admin') {
       return true;
     } else if (currentUser.role === 'Manager') {
@@ -59,15 +190,15 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
   // Apply search and filters
   filteredTasks = filteredTasks.filter((task) => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchTerm.toLowerCase());
+      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
-    const matchesDepartment = departmentFilter === 'All' || task.department === departmentFilter;
+    // Allow tasks without department or match department filter
+    const matchesDepartment = departmentFilter === 'All' || !task.department || task.department === departmentFilter;
     
     return matchesSearch && matchesStatus && matchesPriority && matchesDepartment;
   });
 
-  const departments = Array.from(new Set(tasks.map((t) => t.department)));
 
   const columns: TaskStatus[] = ['To Do', 'In Progress', 'On Hold', 'Completed'];
 
@@ -88,20 +219,118 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
     }
   };
 
+  
+
   const getAssignedUserNames = (userIds: string[]) => {
     return userIds
-      .map((id) => users.find((u) => u.id === id)?.name || 'Unknown')
+      .map((id) => users.find((u) => u.id === id)?.username || 'Unknown')
       .join(', ');
   };
 
+  // Handle create task
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.title || !createForm.projectId || !createForm.assignedTo) {
+      alert('Please fill in all required fields (Title, Project, and Assigned To)');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Map frontend status to backend status
+      const statusMap: Record<string, "Not Started" | "In Progress" | "Completed" | "On Hold" | "Cancelled"> = {
+        'To Do': 'Not Started',
+        'In Progress': 'In Progress',
+        'On Hold': 'On Hold',
+        'Completed': 'Completed',
+        'Not Started': 'Not Started',
+        'Cancelled': 'Cancelled'
+      };
+      
+      const payload: TaskPayload = {
+        title: createForm.title.trim(),
+        description: createForm.description.trim() || undefined,
+        priority: createForm.priority,
+        due_date_and_time: createForm.dueDate ? new Date(createForm.dueDate).toISOString() : undefined,
+        project_id: createForm.projectId, // Send UUID
+        assigned_to: createForm.assignedTo, // Send single UUID string
+        status: statusMap[createForm.status] || 'Not Started',
+        is_active: true
+      };
+
+      await createTaskApi(payload);
+      setIsCreateDialogOpen(false);
+      setCreateForm({
+        title: '',
+        description: '',
+        priority: 'Medium',
+        dueDate: '',
+        department: '',
+        projectId: '',
+        projectName: '',
+        assignedTo: '',
+        status: 'To Do' as TaskStatus // Frontend uses 'To Do', will be mapped to 'Not Started' in payload
+      });
+      await fetchTasks(); // Refresh tasks
+    } catch (error: any) {
+      console.error('Failed to create task:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create task';
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle status update (for drag and drop or click)
+  const handleStatusUpdate = async (taskId: string, newStatus: string) => {
+    try {
+      // Map frontend status to backend status
+      const backendStatusMap: Record<string, "Not Started" | "In Progress" | "Completed" | "On Hold" | "Cancelled"> = {
+        'To Do': 'Not Started',
+        'In Progress': 'In Progress',
+        'On Hold': 'On Hold',
+        'Completed': 'Completed',
+        'Not Started': 'Not Started',
+        'Cancelled': 'Cancelled'
+      };
+      const backendStatus = backendStatusMap[newStatus] || 'Not Started';
+      
+      await updateTaskApi(taskId, { status: backendStatus });
+      await fetchTasks(); // Refresh tasks
+    } catch (error: any) {
+      console.error('Failed to update task status:', error);
+      alert(error?.response?.data?.message || 'Failed to update task status');
+    }
+  };
+
+  // Helper function to convert HH:mm:ss to hours
+  const parseTimeToHours = (timeString: string): number | undefined => {
+    if (!timeString) return undefined;
+    try {
+      const parts = timeString.split(':');
+      if (parts.length === 3) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        const seconds = parseInt(parts[2], 10);
+        return hours + (minutes / 60) + (seconds / 3600);
+      }
+      return parseFloat(timeString);
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Get unique departments from tasks (may be empty if API doesn't provide)
+  const departments = Array.from(new Set(tasksToUse.map((t) => t.department).filter(Boolean)));
+
   const TaskCard = ({ task }: { task: Task }) => (
-    <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
-      onClick={() => onTaskClick(task.id)}
-    >
+      <Card
+        className="cursor-pointer transition-shadow hover:shadow-md"
+        onClick={() => onTaskClick(task.id)}
+      >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-sm">{task.title}</CardTitle>
+          <CardTitle className="text-sm capitalize">{task.title}</CardTitle>
           <Badge variant={getPriorityColor(task.priority)} className="text-xs">
             {task.priority}
           </Badge>
@@ -138,6 +367,25 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
           </div>
         )}
       </CardContent>
+      {(currentUser.role === 'Super Admin' || currentUser.role === 'Admin' || currentUser.role === 'Manager') && (
+        <div className="px-4 pb-3 flex gap-2">
+          <Select 
+            value={task.status === 'To Do' ? 'Not Started' : task.status} 
+            onValueChange={(value) => handleStatusUpdate(task.id, value)}
+          >
+            <SelectTrigger className="h-8 text-xs" onClick={(e) => e.stopPropagation()}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Not Started">Not Started</SelectItem>
+              <SelectItem value="In Progress">In Progress</SelectItem>
+              <SelectItem value="On Hold">On Hold</SelectItem>
+              <SelectItem value="Completed">Completed</SelectItem>
+              <SelectItem value="Cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </Card>
   );
 
@@ -164,10 +412,16 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
                   Add a new task and assign it to team members
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <form onSubmit={handleCreateTask} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="task-title">Title</Label>
-                  <Input id="task-title" placeholder="Enter task title" />
+                  <Label htmlFor="task-title">Title *</Label>
+                  <Input 
+                    id="task-title" 
+                    placeholder="Enter task title" 
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="task-description">Description</Label>
@@ -175,12 +429,17 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
                     id="task-description"
                     placeholder="Enter task description"
                     rows={4}
+                    value={createForm.description}
+                    onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="task-priority">Priority</Label>
-                    <Select>
+                    <Select 
+                      value={createForm.priority} 
+                      onValueChange={(value) => setCreateForm({ ...createForm, priority: value as TaskPriority })}
+                    >
                       <SelectTrigger id="task-priority">
                         <SelectValue placeholder="Select priority" />
                       </SelectTrigger>
@@ -193,40 +452,114 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="task-due-date">Due Date</Label>
-                    <Input id="task-due-date" type="date" />
+                    <Label htmlFor="task-due-date">Due Date *</Label>
+                    <Input 
+                      id="task-due-date" 
+                      type="date" 
+                      value={createForm.dueDate}
+                      onChange={(e) => setCreateForm({ ...createForm, dueDate: e.target.value })}
+                      required
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="task-department">Department</Label>
-                    <Select>
-                      <SelectTrigger id="task-department">
-                        <SelectValue placeholder="Select department" />
+                    <Label htmlFor="task-project">Project *</Label>
+                    <Select 
+                      value={createForm.projectId} 
+                      onValueChange={(value) => {
+                        const selectedProject = projects.find(p => p.id === value);
+                        setCreateForm({ 
+                          ...createForm, 
+                          projectId: value,
+                          projectName: selectedProject?.name || ''
+                        });
+                      }}
+                    >
+                      <SelectTrigger id="task-project">
+                        <SelectValue placeholder="Select project" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="task-project">Project</Label>
-                    <Input id="task-project" placeholder="Project name" />
+                    <Label htmlFor="task-assigned">Assign To *</Label>
+                    <Select 
+                      value={createForm.assignedTo} 
+                      onValueChange={(value) => setCreateForm({ ...createForm, assignedTo: value })}
+                    >
+                      <SelectTrigger id="task-assigned">
+                        <SelectValue placeholder="Select employee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees.length > 0 ? (
+                          employees.map((employee) => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.name || employee.email}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          users.filter(u => u.role !== 'Client').map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.username}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="task-status">Status</Label>
+                  <Select 
+                    value={createForm.status} 
+                    onValueChange={(value) => setCreateForm({ ...createForm, status: value as TaskStatus })}
+                  >
+                    <SelectTrigger id="task-status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Not Started">Not Started</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="On Hold">On Hold</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={() => {
+                      setIsCreateDialogOpen(false);
+                      setCreateForm({
+                        title: '',
+                        description: '',
+                        priority: 'Medium',
+                        dueDate: '',
+                        department: '',
+                        projectId: '',
+                        projectName: '',
+                        assignedTo: '',
+                        status: 'To Do' as TaskStatus
+                      });
+                    }}
+                    disabled={loading}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={() => setIsCreateDialogOpen(false)}>
-                    Create Task
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Creating...' : 'Create Task'}
                   </Button>
                 </div>
-              </div>
+              </form>
             </DialogContent>
           </Dialog>
         )}
@@ -287,7 +620,7 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
           </div>
           <div className="mt-4 flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              Showing {filteredTasks.length} of {tasks.length} tasks
+              Showing {filteredTasks.length} of {tasksToUse.length} tasks
             </p>
             <div className="flex gap-2">
               <Button
@@ -310,7 +643,11 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
       </Card>
 
       {/* Task Board */}
-      {viewMode === 'board' ? (
+      {loading && tasksToUse.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-500">Loading tasks...</p>
+        </div>
+      ) : viewMode === 'board' ? (
         <div className="grid gap-4 md:grid-cols-4">
           {columns.map((status) => {
             const columnTasks = getTasksByStatus(status);

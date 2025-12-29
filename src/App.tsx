@@ -33,7 +33,7 @@ import {
 import type { User } from './types';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationPermission from './components/NotificationPermission';
-import { getProfileApi, logoutApi } from './api/auth';
+import { getProfileApi, logoutApi } from './components/service/auth';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -163,9 +163,9 @@ function App() {
                 onTaskClick={handleTaskClick}
               />
             )}
-            {currentPage === 'task-details' && selectedTask && (
+            {currentPage === 'task-details' && selectedTaskId && (
               <TaskDetails
-                task={selectedTask}
+                taskId={selectedTaskId}
                 users={users}
                 currentUser={currentUser}
                 onBack={handleBackFromTask}
