@@ -8,7 +8,7 @@ import {
   Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
 } from './ui/table';
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue
@@ -61,7 +61,15 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
     await restoreUserApi(id);
     fetchUsers();
   }
-
+  const generatePassword = (length = 12) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}<>?";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
 
   /* ---------------- Form Modal ---------------- */
   const UserForm = ({ user, onClose }: { user?: User, onClose: () => void }) => {
@@ -83,7 +91,7 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
 
         <div className="space-y-2">
           <Label>Phone</Label>
-          <Input id="phone" type="tel" placeholder="+1234567890" defaultValue={user?.phone} />
+          <Input id="phone" type="tel" placeholder="83456 87890" defaultValue={user?.phone} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -126,8 +134,20 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
 
               <button
                 type="button"
+                onClick={() => {
+                  const generated = generatePassword();
+                  (document.getElementById("password") as HTMLInputElement).value = generated;
+                }}
+                className="absolute text-gray-500 hover:text-black outline-0"
+                style={{ right: "35px", top: "50%", transform: "translateY(-50%)" }}
+              >
+                <RefreshCw size={16} />
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                className="absolute text-gray-500 hover:text-black outline-0"
+                style={{ right: "10px", top: "50%", transform: "translateY(-50%)" }}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
