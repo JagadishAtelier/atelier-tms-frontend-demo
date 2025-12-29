@@ -47,11 +47,9 @@ function App() {
   };
 
   const handleLogout = async () => {
-    try {
-      await logoutApi();
-    } catch { }
     setCurrentUser(null);
     setCurrentPage("dashboard");
+    localStorage.clear();
     setSelectedTaskId(null);
   };
 

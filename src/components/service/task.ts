@@ -78,5 +78,5 @@ export const getTaskByProjectApi = (projectId: string) =>
   API.get<{ data: Task[] }>(`/project/${projectId}`);
 
 // Tasks by employee
-export const getTaskByEmployeeApi = (employeeId: string) =>
-  API.get<{ data: Task[] }>(`/employee/${employeeId}`);
+export const getMyTasksApi = () =>
+  API.get<{ data: Task[] }>(`/employee/me`);

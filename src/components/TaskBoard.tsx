@@ -35,7 +35,8 @@ import {
   updateTaskApi,
   deleteTaskApi,
   restoreTaskApi,
-  type TaskPayload
+  type TaskPayload,
+  getMyTasksApi
 } from "./service/task";
 import { getProjectsApi, type Project } from "./service/projectService";
 import { getEmployeesApi, type Employee } from "./service/employeeService";
@@ -72,12 +73,29 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
     status: 'Not Started' as TaskStatus
   });
 
+  let currentEmployeeId = ""
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+     currentEmployeeId = storedUser?.employee_profile?.id;
   // Fetch tasks on mount
   useEffect(() => { 
     fetchTasks(); 
     fetchProjects();
     fetchEmployees();
+    fetchTask();
   }, []);
+
+  async function fetchTask() {
+    try {
+      const res = await getMyTasksApi();
+
+      const responseData = (res.data as any)?.data || res.data;
+      const fetchedTasks = responseData?.data || responseData || [];
+      const tasksArray = Array.isArray(fetchedTasks) ? fetchedTasks : [];
+      
+    } catch (error) {
+      
+    }
+  }
 
   async function fetchTasks() {
     setLoading(true);
@@ -183,7 +201,10 @@ export function TaskBoard({ tasks, users, currentUser, onTaskClick }: TaskBoardP
     } else if (currentUser.role === 'Manager') {
       return task.department === currentUser.department;
     } else {
-      return task.assignedTo.includes(currentUser.id);
+      
+      return task.assignedTo?.some(
+      (id) => String(id) === String(currentEmployeeId) 
+    );
     }
   });
 
