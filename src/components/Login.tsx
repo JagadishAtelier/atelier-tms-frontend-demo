@@ -11,6 +11,7 @@ import {
 } from "./ui/card";
 import { loginApi, forgotPasswordApi, resetPasswordApi } from "./service/auth";
 import type { User } from "../types";
+import { Eye, EyeOff } from "lucide-react";
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -25,6 +26,8 @@ export function Login({ onLogin, users }: LoginProps) {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [success, setSuccess] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,13 +125,26 @@ export function Login({ onLogin, users }: LoginProps) {
             {mode === "login" && (
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="pr-10"  /* space to avoid overlap */
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
+
             )}
 
             {mode === "reset" && (
@@ -168,25 +184,25 @@ export function Login({ onLogin, users }: LoginProps) {
           </form>
 
           <div className="mt-6 border-t pt-6"> {mode === "login" && (
+            <button
+              type="button"
+              onClick={() => setMode("forgot")}
+              className="text-sm text-blue-600 hover:underline text-center w-full"
+            >
+              Forgot password?
+            </button>
+          )}
+
+            {mode !== "login" && (
               <button
                 type="button"
-                onClick={() => setMode("forgot")}
-                className="text-sm text-blue-600 hover:underline text-center w-full"
+                onClick={() => setMode("login")}
+                className="text-sm text-gray-600 hover:underline text-center w-full"
               >
-                Forgot password?
+                Back to login
               </button>
             )}
-
-              {mode !== "login" && (
-                <button
-                  type="button"
-                  onClick={() => setMode("login")}
-                  className="text-sm text-gray-600 hover:underline text-center w-full"
-                >
-                  Back to login
-                </button>
-              )}
-            </div>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-500">

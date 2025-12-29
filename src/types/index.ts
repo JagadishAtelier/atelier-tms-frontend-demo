@@ -6,8 +6,10 @@ export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
 export interface User {
   id: string;
+  _id: string;
   username: string;
   email: string;
+  phone: string;
   role: UserRole;
   department: string;
   avatar?: string;

@@ -8,6 +8,7 @@ import {
   Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
 } from './ui/table';
+import { Eye, EyeOff } from "lucide-react";
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue
@@ -38,6 +39,7 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
 
   /* ---------------- Fetch Users ---------------- */
@@ -63,6 +65,9 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
 
   /* ---------------- Form Modal ---------------- */
   const UserForm = ({ user, onClose }: { user?: User, onClose: () => void }) => {
+    const [role, setRole] = useState<UserRole>(user?.role || 'employee');
+    const [department, setDepartment] = useState(user?.department || '');
+
     return (
       <div className="space-y-4">
 
@@ -76,11 +81,16 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
           <Input id="email" type="email" placeholder="user@example.com" defaultValue={user?.email} />
         </div>
 
+        <div className="space-y-2">
+          <Label>Phone</Label>
+          <Input id="phone" type="tel" placeholder="+1234567890" defaultValue={user?.phone} />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Role</Label>
-            <Select defaultValue={user?.role || 'employee'}>
-              <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+            <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {currentUser.role === 'Super Admin' && <SelectItem value="Super Admin">Super Admin</SelectItem>}
                 <SelectItem value="Admin">Admin</SelectItem>
@@ -93,8 +103,8 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
 
           <div className="space-y-2">
             <Label>Department</Label>
-            <Select defaultValue={user?.department}>
-              <SelectTrigger id="department"><SelectValue placeholder="Select department" /></SelectTrigger>
+            <Select value={department} onValueChange={setDepartment}>
+              <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
               <SelectContent>
                 {departments.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
               </SelectContent>
@@ -105,7 +115,23 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
         {!user && (
           <div className="space-y-2">
             <Label>Initial Password</Label>
-            <Input id="password" type="password" placeholder="Enter password" />
+
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter password"
+                className="pr-10" // space for icon
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
         )}
 
@@ -117,9 +143,9 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
               const formData = {
                 username: (document.getElementById("name") as HTMLInputElement)?.value,
                 email: (document.getElementById("email") as HTMLInputElement)?.value,
-                role: (document.getElementById("role") as HTMLButtonElement)?.value
-                  || user?.role,
-                department: document.querySelector("#department div")?.textContent || user?.department,
+                phone: (document.getElementById("phone") as HTMLInputElement)?.value,
+                role: role,
+                department: department,
                 password: !user ? (document.getElementById("password") as HTMLInputElement)?.value : undefined,
               };
 
@@ -198,7 +224,7 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
                 value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
 
-            <Select value={roleFilter} onValueChange={v => setRoleFilter(v)}>
+            <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
               <SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All</SelectItem>
