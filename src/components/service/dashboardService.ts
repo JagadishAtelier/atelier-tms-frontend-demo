@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-    baseURL: "http://172.23.208.1:4000/api/v1/tms/dashboard",
+    baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/dashboard",
 });
 
 /**
