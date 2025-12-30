@@ -241,7 +241,7 @@ export function TaskDetails({
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant={getStatusColor(task.status)} className="capitalize">
+          <div variant={getStatusColor(task.status)} className="capitalize">
             {(currentUser.role === "Super Admin" ||
               currentUser.role === "Admin" ||
               currentUser.role === "employee") ? (
@@ -262,7 +262,7 @@ export function TaskDetails({
             ) : (
               <span className="px-2">{task.status}</span>
             )}
-          </Badge>
+          </div>
 
           <Badge variant={getPriorityColor(task.priority)}>{task.priority}</Badge>
 

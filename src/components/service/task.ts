@@ -65,7 +65,7 @@ export interface ApiResponse<T> {
 // Axios Instance
 // ===============================
 const API = axios.create({
-  baseURL: "http://192.168.1.40:4000/api/v1/tms/task/task",
+  baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/task/task",
 });
 
 // Attach token
