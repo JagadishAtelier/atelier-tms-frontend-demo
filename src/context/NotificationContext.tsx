@@ -155,46 +155,59 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const subscribeToPush = async () => {
     try {
+      console.log("[PushContext] Initializing push subscription...");
+
       if (!('serviceWorker' in navigator)) {
-        console.warn('Service Worker not supported');
+        console.warn('[PushContext] ❌ Service Worker not supported in this browser');
         return;
       }
 
       const registration = await navigator.serviceWorker.ready;
       if (!registration) {
-        console.warn('Service Worker ready registration not found');
+        console.warn('[PushContext] ❌ Service Worker registration not found');
+        return;
+      }
+
+      console.log("[PushContext] Service Worker is ready");
+
+      if (!registration.pushManager) {
+        console.warn('[PushContext] ❌ Push Manager not available on Service Worker registration. Check if you are using HTTPS or localhost.');
         return;
       }
 
       const existingSubscription = await registration.pushManager.getSubscription();
       if (existingSubscription) {
-        console.log("Already subscribed");
+        console.log("[PushContext] Existing subscription found:", existingSubscription.endpoint);
+        // Still send to backend to ensure sync
+        await import("../components/service/notificationService").then(m => m.subscribeToPushApi(existingSubscription as any));
         return;
       }
 
-      // 1. Get Public Key (Dynamic import to avoid circular dep if any, though likely safe to direct import)
-      // Standard import is better
+      console.log("[PushContext] Requesting VAPID public key...");
       const response = await import("../components/service/notificationService").then(m => m.getVapidPublicKeyApi());
 
       if (!response.data || !response.data.data || !response.data.data.publicKey) {
-        throw new Error("Failed to get VAPID key");
+        throw new Error("Failed to get VAPID key from backend");
       }
 
       const publicKey = response.data.data.publicKey;
+      console.log("[PushContext] VAPID key received:", publicKey);
       const convertedKey = urlBase64ToUint8Array(publicKey);
 
-      // 2. Subscribe
+      console.log("[PushContext] Calling pushManager.subscribe...");
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: convertedKey
       });
 
+      console.log("[PushContext] Subscription successful:", subscription.endpoint);
+
       // 3. Send to backend
       await import("../components/service/notificationService").then(m => m.subscribeToPushApi(subscription as any));
 
-      console.log("Push Notification Subscribed!");
+      console.log("[PushContext] ✅ Backend successfully notified of new subscription");
     } catch (err) {
-      console.error("Failed to subscribe to push notifications", err);
+      console.error("[PushContext] ❌ Error in push subscription flow:", err);
     }
   };
 
@@ -202,6 +215,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     refresh();
     const interval = setInterval(fetchUnreadCount, 60000);
+
+    // Auto-subscribe if permission is already granted but no subscription exists
+    if ("Notification" in window && Notification.permission === "granted") {
+      subscribeToPush().catch(err => console.error("Auto-subscribe failed", err));
+    }
+
     return () => clearInterval(interval);
   }, [fetchNotifications, fetchUnreadCount, fetchStats]);
 
