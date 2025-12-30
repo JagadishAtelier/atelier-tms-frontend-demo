@@ -97,16 +97,7 @@ export interface Department {
   managerId: string;
 }
 
-export interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'task' | 'mention' | 'attendance' | 'system' | 'lead' | 'deal';
-  read: boolean;
-  createdAt: string;
-  link?: string;
-}
+
 
 // CRM Types
 export type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Proposal' | 'Won' | 'Lost';

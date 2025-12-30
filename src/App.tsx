@@ -23,7 +23,7 @@ import {
   attendanceRecords,
   projects,
   departments,
-  notifications,
+
   timeEntries,
   leads,
   customers,
@@ -98,8 +98,7 @@ function App() {
     return <Login onLogin={handleLogin} users={users} />;
   }
 
-  // Filter notifications for current user
-  const userNotifications = notifications.filter((n) => n.userId === currentUser.id);
+
 
   // Find selected task
   const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) : null;
@@ -117,7 +116,7 @@ function App() {
       <div className="flex h-screen flex-col bg-gray-50">
         <Navbar
           currentUser={currentUser}
-          notifications={userNotifications}
+
           onLogout={handleLogout}
           onNavigate={handleNavigate}
         />
