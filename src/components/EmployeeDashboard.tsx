@@ -37,7 +37,8 @@ import {
   getTodayAttendanceApi,
   type Attendance,
   type CheckTime,
-} from '../components/service/attendanceService'; // adjust path if necessary
+} from '../components/service/attendanceService';
+import { getEmployeeDashboardApi } from '../components/service/dashboardService';
 
 interface EmployeeDashboardProps {
   currentUser: User;
@@ -61,6 +62,8 @@ export function EmployeeDashboard({
   const [breakStartTime, setBreakStartTime] = useState<Date | null>(null);
   const [showCheckoutReminder, setShowCheckoutReminder] = useState(false);
   const [loadingToday, setLoadingToday] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
 
   // --- New state for pending task notes modal ---
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
@@ -273,6 +276,22 @@ export function EmployeeDashboard({
   useEffect(() => {
     loadTodayAttendance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
+  // Load dashboard stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true);
+        const res = await getEmployeeDashboardApi();
+        setDashboardStats(res.data?.data || res.data);
+      } catch (error) {
+        console.error("Failed to load dashboard stats", error);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+    fetchStats();
   }, [currentUser?.id]);
 
   // Check if user needs checkout reminder (after 9 hours)
@@ -533,42 +552,42 @@ export function EmployeeDashboard({
   // ---------- Task notes update flow ----------
   // Tries to PATCH /api/v1/task/:id with { notes } — adjust endpoint if your backend differs.
   const updateTaskNotes = async (id: string, notes: string) => {
-  setTaskUpdateLoading(true);
-  setTaskUpdateError(null);
-  setTaskUpdateSuccess(null);
+    setTaskUpdateLoading(true);
+    setTaskUpdateError(null);
+    setTaskUpdateSuccess(null);
 
-  try {
-    await updateTaskApi(id, { notes }); // ✅ using task.ts
+    try {
+      await updateTaskApi(id, { notes }); // ✅ using task.ts
 
-    setTaskUpdateSuccess("Notes updated successfully.");
+      setTaskUpdateSuccess("Notes updated successfully.");
 
-    // close modal and retry sign-out
-    setTimeout(() => {
-      setShowTaskModal(false);
-      setPendingTaskId(null);
+      // close modal and retry sign-out
+      setTimeout(() => {
+        setShowTaskModal(false);
+        setPendingTaskId(null);
+        setTaskUpdateLoading(false);
+        setTaskUpdateError(null);
+
+        // retry sign-out once
+        if (!signOutRetrying) {
+          setSignOutRetrying(true);
+          doSignOut(false).finally(() => setSignOutRetrying(false));
+        }
+      }, 700);
+
+    } catch (err: any) {
+      console.error("Failed to update task notes", err);
+
+      const serverMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.msg ||
+        err?.message ||
+        "Failed to update task notes";
+
+      setTaskUpdateError(serverMsg);
       setTaskUpdateLoading(false);
-      setTaskUpdateError(null);
-
-      // retry sign-out once
-      if (!signOutRetrying) {
-        setSignOutRetrying(true);
-        doSignOut(false).finally(() => setSignOutRetrying(false));
-      }
-    }, 700);
-
-  } catch (err: any) {
-    console.error("Failed to update task notes", err);
-
-    const serverMsg =
-      err?.response?.data?.message ||
-      err?.response?.data?.msg ||
-      err?.message ||
-      "Failed to update task notes";
-
-    setTaskUpdateError(serverMsg);
-    setTaskUpdateLoading(false);
-  }
-};
+    }
+  };
 
 
   // ---------- Helper for display time ----------
@@ -579,33 +598,55 @@ export function EmployeeDashboard({
 
   // ---------- Derived task metrics ----------
   const myTasks = tasks.filter((task) => task.assignedTo?.includes(currentUser.id));
-  const todayTasks = {
+
+  const todayTasks = dashboardStats ? {
+    pending: dashboardStats.tasks?.pending || 0,
+    inProgress: dashboardStats.tasks?.inProgress || 0,
+    completed: dashboardStats.tasks?.completed || 0,
+    total: dashboardStats.tasks?.total || 0
+  } : {
     pending: myTasks.filter((t) => t.status === 'To Do').length,
     inProgress: myTasks.filter((t) => t.status === 'In Progress').length,
     completed: myTasks.filter((t) => t.status === 'Completed').length,
+    total: myTasks.length
   };
-  const overdueTasks = myTasks.filter(
-    (t) => new Date(t.dueDate) < new Date() && t.status !== 'Completed'
-  );
+
+  // Ensure overdueTasks has a .length property for JSX compatibility
+  const overdueTasksCount = dashboardStats
+    ? (dashboardStats.tasks?.overdue || 0)
+    : myTasks.filter((t) => new Date(t.dueDate) < new Date() && t.status !== 'Completed').length;
+
+  const overdueTasks = { length: overdueTasksCount };
 
   // Mock data for performance chart (unchanged)
-  const weeklyPerformance = [
-    { day: 'Mon', tasks: 5, hours: 7.5 },
-    { day: 'Tue', tasks: 6, hours: 8.2 },
-    { day: 'Wed', tasks: 4, hours: 7.8 },
-    { day: 'Thu', tasks: 7, hours: 8.5 },
-    { day: 'Fri', tasks: 5, hours: 7.2 },
-    { day: 'Sat', tasks: 2, hours: 4.0 },
-    { day: 'Sun', tasks: 1, hours: 2.0 },
-  ];
+  // Dynamic performance data
+  const weeklyPerformance = dashboardStats?.tasks?.completionTrend?.map((item: any) => {
+    const d = new Date(item.date);
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    return {
+      day: dayName,
+      tasks: item.completed,
+      hours: 0 // Backend doesn't provide historical hours yet
+    };
+  }) || [
+      { day: 'Mon', tasks: 0, hours: 0 },
+      { day: 'Tue', tasks: 0, hours: 0 },
+      { day: 'Wed', tasks: 0, hours: 0 },
+      { day: 'Thu', tasks: 0, hours: 0 },
+      { day: 'Fri', tasks: 0, hours: 0 },
+      { day: 'Sat', tasks: 0, hours: 0 },
+      { day: 'Sun', tasks: 0, hours: 0 },
+    ];
 
   // Recent activities & notifications (unchanged)
-  const recentActivities = [
-    { id: 1, action: 'Completed task "API Integration"', time: '10 mins ago', icon: CheckCircle2, color: 'text-gray-900 ' },
-    { id: 2, action: 'Started working on "Dashboard UI"', time: '1 hour ago', icon: PlayCircle, color: 'text-[#10b981]' },
-    { id: 3, action: 'Submitted timesheet for approval', time: '2 hours ago', icon: Clock, color: 'text-[#f59e0b]' },
-    { id: 4, action: 'Joined team meeting', time: '3 hours ago', icon: Activity, color: 'text-[#3b82f6]' },
-  ];
+  // Recent tasks from API
+  const recentActivities = dashboardStats?.recentTasks?.map((task: any) => ({
+    id: task.id,
+    action: `Worked on "${task.title}"`,
+    time: new Date(task.updatedAt).toLocaleDateString(),
+    icon: task.status === 'Completed' ? CheckCircle2 : PlayCircle,
+    color: task.status === 'Completed' ? 'text-green-600' : 'text-blue-600'
+  })) || [];
 
   const notifications = [
     { id: 1, message: 'New task assigned: Mobile App Design', type: 'info', time: '5 mins ago' },
