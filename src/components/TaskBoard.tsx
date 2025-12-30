@@ -80,6 +80,7 @@ export function TaskBoard({
     status: "Not Started" as TaskStatus, // backend-aligned
   });
 
+<<<<<<< HEAD
   // current employee id from local user (if present)
   const storedUser = (() => {
     try {
@@ -91,12 +92,19 @@ export function TaskBoard({
   const currentEmployeeId = storedUser?.employee_profile?.id || "";
 
   // ========== Effects ==========
+=======
+  let currentEmployeeId = ""
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  currentEmployeeId = storedUser?.employee_profile?.id;
+  // Fetch tasks on mount
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
   useEffect(() => {
     fetchTasks();
     fetchProjects();
     fetchEmployees();
   }, []);
 
+<<<<<<< HEAD
   // ========== API helpers / robust parsing ==========
   function extractData<T = any>(res: any): T {
     // Common patterns:
@@ -111,6 +119,18 @@ export function TaskBoard({
       const d2 = d.data;
       if (d2 && d2.data !== undefined) return d2.data as T;
       return d2 as T;
+=======
+  async function fetchTask() {
+    try {
+      const res = await getMyTasksApi();
+
+      const responseData = (res.data as any)?.data || res.data;
+      const fetchedTasks = responseData?.data || responseData || [];
+      const tasksArray = Array.isArray(fetchedTasks) ? fetchedTasks : [];
+
+    } catch (error) {
+
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
     }
     return d as T;
   }
@@ -120,6 +140,7 @@ export function TaskBoard({
     setLoading(true);
     try {
       const res = await getTasksApi();
+<<<<<<< HEAD
       const data = extractData<any>(res);
       // data may be array or object with pagination: { total, currentPage, data: [...] }
       let tasksArray: any[] = [];
@@ -129,6 +150,59 @@ export function TaskBoard({
       else tasksArray = [];
 
       const mappedTasks: TaskType[] = tasksArray.map((t: any) => mapApiTaskToFrontend(t));
+=======
+      // Handle nested response structure: data.data.data
+      const responseData = (res.data as any)?.data || res.data;
+      const fetchedTasks = responseData?.data || responseData || [];
+      const tasksArray = Array.isArray(fetchedTasks) ? fetchedTasks : [];
+
+      // Map API tasks to match the expected Task type
+      const mappedTasks: Task[] = tasksArray.map((task: any) => {
+        // Map status: null -> 'To Do', or map backend status to frontend status
+        const statusMap: Record<string, TaskStatus> = {
+          'Not Started': 'To Do',
+          'In Progress': 'In Progress',
+          'On Hold': 'On Hold',
+          'Completed': 'Completed',
+          'Cancelled': 'On Hold' // Map cancelled to On Hold for frontend
+        };
+        const frontendStatus = task.status
+          ? (statusMap[task.status] || 'To Do')
+          : 'To Do';
+
+        // Map priority: null -> 'Medium'
+        const priorityMap: Record<string, TaskPriority> = {
+          'Low': 'Low',
+          'Medium': 'Medium',
+          'High': 'High',
+          'Urgent': 'Urgent'
+        };
+        const frontendPriority = task.priority
+          ? (priorityMap[task.priority] || 'Medium')
+          : 'Medium';
+
+        return {
+          id: task.id,
+          title: task.title || '',
+          description: task.description || '',
+          status: frontendStatus,
+          priority: frontendPriority,
+          assignedTo: task.assigned_to ? [task.assigned_to] : [], // Convert single ID to array
+          assignedBy: task.created_by || currentUser.id,
+          createdAt: task.createdAt || new Date().toISOString(),
+          dueDate: task.due_date_and_time || task.dueDate || new Date().toISOString(),
+          project: task.project?.name || task.project_id || '',
+          department: task.department || '', // May not be in API response
+          tags: task.tags || [],
+          timeSpent: task.timeSpent || (task.timetaken ? parseTimeToHours(task.timetaken) : undefined),
+          estimatedTime: task.estimatedTime,
+          subtasks: task.subtasks,
+          attachments: task.attachments,
+          comments: task.comments
+        };
+      });
+      console.log('Fetched tasks:', mappedTasks.length, mappedTasks);
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
       setLocalTasks(mappedTasks);
     } catch (err) {
       console.error("Failed to fetch tasks:", err);
@@ -181,6 +255,7 @@ export function TaskBoard({
     }
   }
 
+<<<<<<< HEAD
   // ========== Mapping helpers ==========
   function mapApiTaskToFrontend(task: any): TaskType {
     // Backend fields:
@@ -197,6 +272,38 @@ export function TaskBoard({
     // Use assignee relation name if available
     const projectName = task.project?.name ?? task.project_name ?? task.project_id ?? "";
     const timetaken = task.timetaken ?? null;
+=======
+  // Use localTasks if available, otherwise fall back to prop
+  const tasksToUse = Array.isArray(localTasks) && localTasks.length > 0
+    ? localTasks
+    : (Array.isArray(tasks) ? tasks : []);
+
+  // Filter tasks based on user role and filters
+  let filteredTasks = tasksToUse.filter((task) => {
+    if (currentUser.role === 'Super Admin' || currentUser.role === 'Admin') {
+      return true;
+    } else if (currentUser.role === 'Manager') {
+      return task.department === currentUser.department;
+    } else {
+
+      return task.assignedTo?.some(
+        (id) => String(id) === String(currentEmployeeId)
+      );
+    }
+  });
+
+  // Apply search and filters
+  filteredTasks = filteredTasks.filter((task) => {
+    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
+    const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
+    // Allow tasks without department or match department filter
+    const matchesDepartment = departmentFilter === 'All' || !task.department || task.department === departmentFilter;
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesDepartment;
+  });
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
 
     const frontend: TaskType = {
       ...task,
@@ -231,7 +338,112 @@ export function TaskBoard({
     return frontend;
   }
 
+<<<<<<< HEAD
   // convert HH:mm:ss to hours float (same helper you had)
+=======
+  const getTasksByStatus = (status: TaskStatus) => {
+    return filteredTasks.filter((task) => task.status === status);
+  };
+
+  const getPriorityColor = (priority: TaskPriority) => {
+    switch (priority) {
+      case 'Urgent':
+        return 'destructive';
+      case 'High':
+        return 'default';
+      case 'Medium':
+        return 'secondary';
+      case 'Low':
+        return 'outline';
+    }
+  };
+
+
+
+  const getAssignedUserNames = (userIds: string[]) => {
+    return userIds
+      .map((id) => users.find((u) => u.id === id)?.username || 'Unknown')
+      .join(', ');
+  };
+
+  // Handle create task
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.title || !createForm.projectId || !createForm.assignedTo) {
+      alert('Please fill in all required fields (Title, Project, and Assigned To)');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Map frontend status to backend status
+      const statusMap: Record<string, "Not Started" | "In Progress" | "Completed" | "On Hold" | "Cancelled"> = {
+        'To Do': 'Not Started',
+        'In Progress': 'In Progress',
+        'On Hold': 'On Hold',
+        'Completed': 'Completed',
+        'Not Started': 'Not Started',
+        'Cancelled': 'Cancelled'
+      };
+
+      const payload: TaskPayload = {
+        title: createForm.title.trim(),
+        description: createForm.description.trim() || undefined,
+        priority: createForm.priority,
+        due_date_and_time: createForm.dueDate ? new Date(createForm.dueDate).toISOString() : undefined,
+        project_id: createForm.projectId, // Send UUID
+        assigned_to: createForm.assignedTo, // Send single UUID string
+        status: statusMap[createForm.status] || 'Not Started',
+        is_active: true
+      };
+
+      await createTaskApi(payload);
+      setIsCreateDialogOpen(false);
+      setCreateForm({
+        title: '',
+        description: '',
+        priority: 'Medium',
+        dueDate: '',
+        department: '',
+        projectId: '',
+        projectName: '',
+        assignedTo: '',
+        status: 'To Do' as TaskStatus // Frontend uses 'To Do', will be mapped to 'Not Started' in payload
+      });
+      await fetchTasks(); // Refresh tasks
+    } catch (error: any) {
+      console.error('Failed to create task:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create task';
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle status update (for drag and drop or click)
+  const handleStatusUpdate = async (taskId: string, newStatus: string) => {
+    try {
+      // Map frontend status to backend status
+      const backendStatusMap: Record<string, "Not Started" | "In Progress" | "Completed" | "On Hold" | "Cancelled"> = {
+        'To Do': 'Not Started',
+        'In Progress': 'In Progress',
+        'On Hold': 'On Hold',
+        'Completed': 'Completed',
+        'Not Started': 'Not Started',
+        'Cancelled': 'Cancelled'
+      };
+      const backendStatus = backendStatusMap[newStatus] || 'Not Started';
+
+      await updateTaskApi(taskId, { status: backendStatus });
+      await fetchTasks(); // Refresh tasks
+    } catch (error: any) {
+      console.error('Failed to update task status:', error);
+      alert(error?.response?.data?.message || 'Failed to update task status');
+    }
+  };
+
+  // Helper function to convert HH:mm:ss to hours
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
   const parseTimeToHours = (timeString: string): number | undefined => {
     if (!timeString) return undefined;
     try {
@@ -252,6 +464,7 @@ export function TaskBoard({
   const tasksToUse: TaskType[] =
     Array.isArray(localTasks) && localTasks.length > 0 ? localTasks : Array.isArray(tasks) ? tasks : [];
 
+<<<<<<< HEAD
   // ========== Filtering ==========
   const filteredTasks = tasksToUse.filter((task) => {
     // role based visibility
@@ -372,6 +585,13 @@ export function TaskBoard({
   // ========== Task card component ==========
   const TaskCard = ({ task }: { task: TaskType }) => (
     <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => onTaskClick(task.id)}>
+=======
+  const TaskCard = ({ task }: { task: Task }) => (
+    <Card
+      className="cursor-pointer transition-shadow hover:shadow-md"
+      onClick={() => onTaskClick(task.id)}
+    >
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-sm capitalize">{task.title}</CardTitle>
@@ -410,10 +630,19 @@ export function TaskBoard({
           </div>
         )}
       </CardContent>
+<<<<<<< HEAD
 
       {(currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Manager") && (
         <div className="px-4 pb-3 flex gap-2">
           <Select value={task.status ?? "Not Started"} onValueChange={(value) => handleStatusUpdate(task.id, value as TaskStatus)}>
+=======
+      {(currentUser.role === 'Super Admin' || currentUser.role === 'Admin' || currentUser.role === 'Manager' || currentUser.role === 'employee') && (
+        <div className="px-4 pb-3 flex gap-2">
+          <Select
+            value={task.status === 'To Do' ? 'Not Started' : task.status}
+            onValueChange={(value) => handleStatusUpdate(task.id, value)}
+          >
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
             <SelectTrigger className="h-8 text-xs" onClick={(e) => e.stopPropagation()}>
               <SelectValue />
             </SelectTrigger>
@@ -499,7 +728,11 @@ export function TaskBoard({
                   </div>
 
                   <div className="space-y-2">
+<<<<<<< HEAD
                     <Label htmlFor="task-due-date">Due Date</Label>
+=======
+                    <Label htmlFor="task-due-date">Due Date *</Label>
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
                     <Input
                       id="task-due-date"
                       type="date"
@@ -515,8 +748,17 @@ export function TaskBoard({
                     <Select
                       value={createForm.projectId}
                       onValueChange={(value) => {
+<<<<<<< HEAD
                         const selected = projects.find((p) => p.id === value);
                         setCreateForm({ ...createForm, projectId: value, projectName: selected?.name ?? "" });
+=======
+                        const selectedProject = projects.find(p => p.id === value);
+                        setCreateForm({
+                          ...createForm,
+                          projectId: value,
+                          projectName: selectedProject?.name || ''
+                        });
+>>>>>>> 2fb70f69aab31128bcd464951a41bbdee0777e19
                       }}
                     >
                       <SelectTrigger id="task-project">
