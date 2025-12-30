@@ -78,9 +78,9 @@ export function TaskDetails({
     return d;
   }
 
-  async function fetchTask() {
+  async function fetchTask(silentBackground = false) {
     if (!taskId) return;
-    setLoading(true);
+    if (!silentBackground) setLoading(true);
     try {
       const res = await getTaskByIdApi(taskId);
       const taskData = extractResponseData(res) || (res as any).data || res;
@@ -115,7 +115,7 @@ export function TaskDetails({
     } catch (error) {
       console.error("Failed to fetch task:", error);
     } finally {
-      setLoading(false);
+      if (!silentBackground) setLoading(false);
     }
   }
 
@@ -190,12 +190,21 @@ export function TaskDetails({
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!task) return;
     if (newStatus === task.status) return;
+
+    // Optimistic update
+    const previousStatus = task.status;
+    setTask(prev => prev ? { ...prev, status: newStatus } : null);
     setStatusUpdating(true);
+
     try {
       await updateTaskApi(task.id, { status: newStatus });
-      await fetchTask();
+      // Silent refresh to get server-calculated fields like time tracking logic if needed,
+      // but without showing the full page loading spinner.
+      await fetchTask(true);
     } catch (err: any) {
       console.error("Failed to update task status:", err);
+      // Revert optimization on failure
+      setTask(prev => prev ? { ...prev, status: previousStatus } : null);
       alert(err?.response?.data?.message || "Failed to update task status");
     } finally {
       setStatusUpdating(false);
@@ -218,7 +227,7 @@ export function TaskDetails({
     setSavingStatus(true);
     try {
       await updateTaskApi(task.id, { status: editStatusValue });
-      await fetchTask();
+      await fetchTask(true);
       setIsStatusEditOpen(false);
     } catch (err: any) {
       console.error("Failed to save status:", err);
@@ -241,76 +250,15 @@ export function TaskDetails({
         </div>
 
         <div className="flex items-center gap-2">
-          <div variant={getStatusColor(task.status)} className="capitalize">
-            {(currentUser.role === "Super Admin" ||
-              currentUser.role === "Admin" ||
-              currentUser.role === "employee") ? (
-              <div>
-                <Select value={task.status} onValueChange={(v) => handleStatusChange(v as TaskStatus)}>
-                  <SelectTrigger className="h-8 text-xs ">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="On Hold">On Hold</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <span className="px-2">{task.status}</span>
-            )}
+          <div className="flex items-center gap-2">
+
+            {/* Display Current Status Badge */}
+            <div className="capitalize">
+              <Badge variant={getStatusColor(task.status)}>{task.status}</Badge>
+            </div>
           </div>
 
           <Badge variant={getPriorityColor(task.priority)}>{task.priority}</Badge>
-
-          {/* Status-only Edit button for admins/managers */}
-          {(currentUser.role === "Super Admin" ||
-            currentUser.role === "Admin" ||
-            currentUser.role === "Manager") && (
-            <Dialog open={isStatusEditOpen} onOpenChange={setIsStatusEditOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" onClick={openStatusEditDialog}>
-                  <Edit2 className="h-4 w-4 mr-2" /> Update Status
-                </Button>
-              </DialogTrigger>
-
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Update Task Status</DialogTitle>
-                  <DialogDescription>Change only the task status. This will trigger timing logic on the server.</DialogDescription>
-                </DialogHeader>
-
-                <form onSubmit={handleSaveStatusOnly} className="mt-4 space-y-4">
-                  <div>
-                    <Select value={editStatusValue} onValueChange={(v) => setEditStatusValue(v as TaskStatus)}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Not Started">Not Started</SelectItem>
-                        <SelectItem value="In Progress">In Progress</SelectItem>
-                        <SelectItem value="On Hold">On Hold</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
-                        <SelectItem value="Cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setIsStatusEditOpen(false)} disabled={savingStatus}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={savingStatus}>
-                      {savingStatus ? "Saving..." : "Save Status"}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
         </div>
       </div>
 
@@ -430,8 +378,94 @@ export function TaskDetails({
 
               <Progress value={Math.min(100, Math.round(timeProgress))} />
 
+              {/* Status Action Buttons */}
+              {(currentUser.role === "employee" ||
+                currentUser.role === "Manager") && (
+                  <div className="mt-4">
+                    {task.status === "Not Started" && (
+                      <Button
+                        size="sm"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => handleStatusChange("In Progress")}
+                        disabled={statusUpdating}
+                      >
+                        Start Now
+                      </Button>
+                    )}
+
+                    {task.status === "In Progress" && (
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleStatusChange("On Hold")}
+                          disabled={statusUpdating}
+                        >
+                          Pause
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 bg-black hover:bg-black text-white"
+                          onClick={() => handleStatusChange("Completed")}
+                          disabled={statusUpdating}
+                        >
+                          Complete
+                        </Button>
+                      </div>
+                    )}
+
+                    {task.status === "On Hold" && (
+                      <Button
+                        size="sm"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => handleStatusChange("In Progress")}
+                        disabled={statusUpdating}
+                      >
+                        Resume
+                      </Button>
+                    )}
+
+                    {task.status === "Completed" && (
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => handleStatusChange("Cancelled")}
+                          disabled={statusUpdating}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleStatusChange("In Progress")}
+                          disabled={statusUpdating}
+                        >
+                          Restart
+                        </Button>
+                      </div>
+                    )}
+
+                    {task.status === "Cancelled" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleStatusChange("In Progress")}
+                        disabled={statusUpdating}
+                      >
+                        Restart
+                      </Button>
+                    )}
+                  </div>
+                )}
+
               {/* Sidebar status select (admins/managers) */}
-              {(currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Manager") && (
+              {(currentUser.role === "Super Admin" || currentUser.role === "Admin") && (
                 <div className="mt-2">
                   <Select value={task.status} onValueChange={(v) => handleStatusChange(v as TaskStatus)}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>

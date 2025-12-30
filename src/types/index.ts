@@ -1,6 +1,6 @@
 export type UserRole = 'Super Admin' | 'Admin' | 'Manager' | 'employee' | 'Client';
 
-export type TaskStatus = 'To Do' | 'In Progress' | 'Completed' | 'On Hold';
+export type TaskStatus = 'To Do' | 'Not Started' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';
 
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
