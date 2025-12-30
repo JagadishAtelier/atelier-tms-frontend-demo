@@ -198,76 +198,78 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
           <CardTitle>Task Time Breakdown</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Task</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Time Spent</TableHead>
-                <TableHead>Estimated</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tasksWithTime.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-gray-500">
-                    No tasks with time tracking
-                  </TableCell>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Time Spent</TableHead>
+                  <TableHead>Estimated</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
-              ) : (
-                tasksWithTime.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm">{task.title}</p>
-                        <p className="text-xs text-gray-500">{task.project}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getTaskStatus(task)}>{task.status}</Badge>
-                    </TableCell>
-                    <TableCell>{task.actualTimeSpent.toFixed(1)}h</TableCell>
-                    <TableCell>{task.estimatedTime || 0}h</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress
-                          value={Math.min(task.timeProgress, 100)}
-                          className="w-24"
-                        />
-                        <span className="text-xs text-gray-500">
-                          {task.timeProgress.toFixed(0)}%
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {activeTaskId === task.id ? (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={handleStopTimer}
-                        >
-                          <Pause className="mr-1 h-3 w-3" />
-                          Stop
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStartTimer(task.id)}
-                          disabled={task.status === 'Completed'}
-                        >
-                          <Play className="mr-1 h-3 w-3" />
-                          Start
-                        </Button>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {tasksWithTime.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-gray-500">
+                      No tasks with time tracking
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  tasksWithTime.map((task) => (
+                    <TableRow key={task.id}>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm">{task.title}</p>
+                          <p className="text-xs text-gray-500">{task.project}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getTaskStatus(task)}>{task.status}</Badge>
+                      </TableCell>
+                      <TableCell>{task.actualTimeSpent.toFixed(1)}h</TableCell>
+                      <TableCell>{task.estimatedTime || 0}h</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress
+                            value={Math.min(task.timeProgress, 100)}
+                            className="w-24"
+                          />
+                          <span className="text-xs text-gray-500">
+                            {task.timeProgress.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {activeTaskId === task.id ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleStopTimer}
+                          >
+                            <Pause className="mr-1 h-3 w-3" />
+                            Stop
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStartTimer(task.id)}
+                            disabled={task.status === 'Completed'}
+                          >
+                            <Play className="mr-1 h-3 w-3" />
+                            Start
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -277,49 +279,51 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
           <CardTitle>Recent Time Entries</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Task</TableHead>
-                <TableHead>Start Time</TableHead>
-                <TableHead>End Time</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {myTimeEntries.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-gray-500">
-                    No time entries recorded
-                  </TableCell>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Notes</TableHead>
                 </TableRow>
-              ) : (
-                myTimeEntries.slice(0, 10).map((entry) => {
-                  const task = myTasks.find((t) => t.id === entry.taskId);
-                  return (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        <p className="text-sm">{task?.title || 'Unknown Task'}</p>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(entry.startTime).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        {entry.endTime
-                          ? new Date(entry.endTime).toLocaleString()
-                          : 'In Progress'}
-                      </TableCell>
-                      <TableCell>{entry.duration?.toFixed(1) || '-'}h</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {entry.notes || '-'}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {myTimeEntries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-gray-500">
+                      No time entries recorded
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  myTimeEntries.slice(0, 10).map((entry) => {
+                    const task = myTasks.find((t) => t.id === entry.taskId);
+                    return (
+                      <TableRow key={entry.id}>
+                        <TableCell>
+                          <p className="text-sm">{task?.title || 'Unknown Task'}</p>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(entry.startTime).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {entry.endTime
+                            ? new Date(entry.endTime).toLocaleString()
+                            : 'In Progress'}
+                        </TableCell>
+                        <TableCell>{entry.duration?.toFixed(1) || '-'}h</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {entry.notes || '-'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

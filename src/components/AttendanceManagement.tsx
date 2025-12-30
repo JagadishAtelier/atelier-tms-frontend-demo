@@ -259,73 +259,75 @@ export function AttendanceManagement({
           <CardTitle>Attendance Records</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
-                <TableHead>Total Hours</TableHead>
-                <TableHead>Status</TableHead>
-                {(currentUser.role === 'Super Admin' || currentUser.role === 'Admin') && (
-                  <TableHead>Actions</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {todayAttendance.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-500">
-                    No attendance records found
-                  </TableCell>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Check In</TableHead>
+                  <TableHead>Check Out</TableHead>
+                  <TableHead>Total Hours</TableHead>
+                  <TableHead>Status</TableHead>
+                  {(currentUser.role === 'Super Admin' || currentUser.role === 'Admin') && (
+                    <TableHead>Actions</TableHead>
+                  )}
                 </TableRow>
-              ) : (
-                todayAttendance.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{record.userName}</TableCell>
-                    <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      {new Date(record.checkIn).toLocaleTimeString()}
+              </TableHeader>
+              <TableBody>
+                {todayAttendance.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-gray-500">
+                      No attendance records found
                     </TableCell>
-                    <TableCell>
-                      {record.checkOut
-                        ? new Date(record.checkOut).toLocaleTimeString()
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {record.totalHours ? `${record.totalHours.toFixed(2)}h` : '-'}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(record.status)}</TableCell>
-                    {(currentUser.role === 'Super Admin' || currentUser.role === 'Admin') && (
-                      <TableCell>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              Edit
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Edit Attendance</DialogTitle>
-                              <DialogDescription>
-                                Manually edit attendance record for {record.userName}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <p className="text-sm text-gray-500">
-                                Manual attendance editing would be available here
-                              </p>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </TableCell>
-                    )}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  todayAttendance.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>{record.userName}</TableCell>
+                      <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {new Date(record.checkIn).toLocaleTimeString()}
+                      </TableCell>
+                      <TableCell>
+                        {record.checkOut
+                          ? new Date(record.checkOut).toLocaleTimeString()
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {record.totalHours ? `${record.totalHours.toFixed(2)}h` : '-'}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(record.status)}</TableCell>
+                      {(currentUser.role === 'Super Admin' || currentUser.role === 'Admin') && (
+                        <TableCell>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Edit Attendance</DialogTitle>
+                                <DialogDescription>
+                                  Manually edit attendance record for {record.userName}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <p className="text-sm text-gray-500">
+                                  Manual attendance editing would be available here
+                                </p>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

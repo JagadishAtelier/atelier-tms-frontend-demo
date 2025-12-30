@@ -22,7 +22,7 @@ interface SidebarProps {
   onNavigate: (page: string) => void;
 }
 
-export function Sidebar({ currentPage, userRole, userDepartment, onNavigate }: SidebarProps) {
+export function SidebarContent({ currentPage, userRole, userDepartment, onNavigate, onClose }: SidebarProps & { onClose?: () => void }) {
   const operationsItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Admin', 'Manager', 'employee', 'Client'], departments: ['all'] },
     // { id: 'employee-dashboard', label: 'employee View', icon: LayoutDashboard, roles: ['employee'], departments: ['all'] },
@@ -46,13 +46,13 @@ export function Sidebar({ currentPage, userRole, userDepartment, onNavigate }: S
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Admin', 'Manager', 'employee', 'Client'], departments: ['all'] },
   ];
 
-  const filterItems = (items: typeof operationsItems) => 
+  const filterItems = (items: typeof operationsItems) =>
     items.filter((item) => {
       const hasRole = item.roles.includes(userRole);
-      const hasDepartment = item.departments.includes('all') || 
-                           item.departments.includes(userDepartment) ||
-                           userRole === 'Super Admin' ||
-                           userRole === 'Admin';
+      const hasDepartment = item.departments.includes('all') ||
+        item.departments.includes(userDepartment) ||
+        userRole === 'Super Admin' ||
+        userRole === 'Admin';
       return hasRole && hasDepartment;
     });
 
@@ -61,72 +61,87 @@ export function Sidebar({ currentPage, userRole, userDepartment, onNavigate }: S
   const visibleSettingsItems = filterItems(settingsItems);
 
   return (
-    <aside className="w-64 border-r bg-white">
-      <nav className="flex flex-col gap-1 p-4">
-        {/* Operations Section */}
-        {visibleOperationsItems.length > 0 && (
-          <>
-            <p className="mb-2 px-3 text-xs text-gray-500">OPERATIONS</p>
-            {visibleOperationsItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.id}
-                  variant={currentPage === item.id ? 'default' : 'ghost'}
-                  className="justify-start"
-                  onClick={() => onNavigate(item.id)}
-                >
-                  <Icon className="mr-2 h-4 w-4" />
-                  {item.label}
-                </Button>
-              );
-            })}
-          </>
-        )}
+    <nav className="flex flex-col gap-1 p-4 h-full overflow-y-auto">
+      {/* Operations Section */}
+      {visibleOperationsItems.length > 0 && (
+        <>
+          <p className="mb-2 px-3 text-xs text-gray-500">OPERATIONS</p>
+          {visibleOperationsItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                key={item.id}
+                variant={currentPage === item.id ? 'default' : 'ghost'}
+                className="justify-start w-full"
+                onClick={() => {
+                  onNavigate(item.id);
+                  onClose?.();
+                }}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                {item.label}
+              </Button>
+            );
+          })}
+        </>
+      )}
 
-        {/* CRM Section */}
-        {visibleCRMItems.length > 0 && (
-          <>
-            <Separator className="my-3" />
-            <p className="mb-2 px-3 text-xs text-gray-500">SALES CRM</p>
-            {visibleCRMItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.id}
-                  variant={currentPage === item.id ? 'default' : 'ghost'}
-                  className="justify-start"
-                  onClick={() => onNavigate(item.id)}
-                >
-                  <Icon className="mr-2 h-4 w-4" />
-                  {item.label}
-                </Button>
-              );
-            })}
-          </>
-        )}
+      {/* CRM Section */}
+      {visibleCRMItems.length > 0 && (
+        <>
+          <Separator className="my-3" />
+          <p className="mb-2 px-3 text-xs text-gray-500">SALES CRM</p>
+          {visibleCRMItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                key={item.id}
+                variant={currentPage === item.id ? 'default' : 'ghost'}
+                className="justify-start w-full"
+                onClick={() => {
+                  onNavigate(item.id);
+                  onClose?.();
+                }}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                {item.label}
+              </Button>
+            );
+          })}
+        </>
+      )}
 
-        {/* Settings Section */}
-        {visibleSettingsItems.length > 0 && (
-          <>
-            <Separator className="my-3" />
-            {visibleSettingsItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.id}
-                  variant={currentPage === item.id ? 'default' : 'ghost'}
-                  className="justify-start"
-                  onClick={() => onNavigate(item.id)}
-                >
-                  <Icon className="mr-2 h-4 w-4" />
-                  {item.label}
-                </Button>
-              );
-            })}
-          </>
-        )}
-      </nav>
+      {/* Settings Section */}
+      {visibleSettingsItems.length > 0 && (
+        <>
+          <Separator className="my-3" />
+          {visibleSettingsItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                key={item.id}
+                variant={currentPage === item.id ? 'default' : 'ghost'}
+                className="justify-start w-full"
+                onClick={() => {
+                  onNavigate(item.id);
+                  onClose?.();
+                }}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                {item.label}
+              </Button>
+            );
+          })}
+        </>
+      )}
+    </nav>
+  );
+}
+
+export function Sidebar(props: SidebarProps) {
+  return (
+    <aside className="w-64 border-r bg-white hidden md:block shrink-0 h-full">
+      <SidebarContent {...props} />
     </aside>
   );
 }

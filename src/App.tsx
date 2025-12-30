@@ -116,7 +116,7 @@ function App() {
       <div className="flex h-screen flex-col bg-gray-50">
         <Navbar
           currentUser={currentUser}
-
+          currentPage={currentPage}
           onLogout={handleLogout}
           onNavigate={handleNavigate}
         />

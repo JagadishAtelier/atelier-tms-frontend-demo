@@ -337,49 +337,51 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
       <Card>
         <CardHeader><CardTitle>Users</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead><TableHead>Email</TableHead>
-                <TableHead>Role</TableHead><TableHead>Department</TableHead>
-                <TableHead>Status</TableHead><TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {filteredUsers.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center">No Users Found</TableCell></TableRow>
-              )}
-
-              {filteredUsers.map(user => (
-                <TableRow key={user.id || user._id}>
-                  <TableCell>{user.username}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell><Badge>{user.role}</Badge></TableCell>
-                  <TableCell>{user.department}</TableCell>
-                  <TableCell>{user.isActive ? <UserCheck className="text-green-600" /> : <UserX className="text-red-500" />}</TableCell>
-                  <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
-
-                  <TableCell className="flex gap-2">
-
-                    {/* Edit */}
-                    <Button variant="ghost" size="sm"
-                      onClick={() => { setSelectedUser(user); setIsEditDialogOpen(true); }}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-
-                    {/* Delete */}
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id || user._id)}>
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
-
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead><TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead><TableHead>Department</TableHead>
+                  <TableHead>Status</TableHead><TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
+              </TableHeader>
 
-            </TableBody>
-          </Table>
+              <TableBody>
+                {filteredUsers.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="text-center">No Users Found</TableCell></TableRow>
+                )}
+
+                {filteredUsers.map(user => (
+                  <TableRow key={user.id || user._id}>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell><Badge>{user.role}</Badge></TableCell>
+                    <TableCell>{user.department}</TableCell>
+                    <TableCell>{user.isActive ? <UserCheck className="text-green-600" /> : <UserX className="text-red-500" />}</TableCell>
+                    <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+
+                    <TableCell className="flex gap-2">
+
+                      {/* Edit */}
+                      <Button variant="ghost" size="sm"
+                        onClick={() => { setSelectedUser(user); setIsEditDialogOpen(true); }}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+
+                      {/* Delete */}
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id || user._id)}>
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -390,7 +392,7 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
           <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
           {selectedUser && (
             <UserForm
-              user={selectedUser}
+              user={selectedUser || undefined}
               onClose={() => setIsEditDialogOpen(false)}
               departments={departments}
               currentUser={currentUser}
@@ -400,6 +402,6 @@ export function UserManagement({ departments, currentUser }: { departments: Depa
         </DialogContent>
       </Dialog>
 
-    </div>
+    </div >
   );
 }

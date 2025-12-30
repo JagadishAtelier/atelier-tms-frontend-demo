@@ -213,160 +213,162 @@ export function CustomerManagement({ customers, users, currentUser }: CustomerMa
           <CardTitle>Customers</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Industry</TableHead>
-                <TableHead>Region</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCustomers.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-gray-500">
-                    No customers found
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Industry</TableHead>
+                  <TableHead>Region</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>{customer.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <span>{customer.company}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs">
-                          <Mail className="h-3 w-3" />
-                          <span>{customer.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <Phone className="h-3 w-3" />
-                          <span>{customer.phone}</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{customer.industry}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-gray-400" />
-                        <span>{customer.region}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(customer.status)}</TableCell>
-                    <TableCell>${customer.totalValue.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedCustomer(customer)}
-                          >
-                            View Details
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl">
-                          <DialogHeader>
-                            <DialogTitle>{customer.name} - {customer.company}</DialogTitle>
-                            <DialogDescription>
-                              Customer details and communication history
-                            </DialogDescription>
-                          </DialogHeader>
-                          <Tabs defaultValue="details">
-                            <TabsList>
-                              <TabsTrigger value="details">Details</TabsTrigger>
-                              <TabsTrigger value="history">Communication History</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="details" className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm text-gray-500">Email</p>
-                                  <p className="text-sm">{customer.email}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-gray-500">Phone</p>
-                                  <p className="text-sm">{customer.phone}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-gray-500">Industry</p>
-                                  <p className="text-sm">{customer.industry}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-gray-500">Region</p>
-                                  <p className="text-sm">{customer.region}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-gray-500">Total Value</p>
-                                  <p className="text-sm">${customer.totalValue.toLocaleString()}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-gray-500">Status</p>
-                                  {getStatusBadge(customer.status)}
-                                </div>
-                                {customer.address && (
-                                  <div className="col-span-2">
-                                    <p className="text-sm text-gray-500">Address</p>
-                                    <p className="text-sm">{customer.address}</p>
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-500">Tags</p>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {customer.tags.map((tag, idx) => (
-                                    <Badge key={idx} variant="outline">
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="history" className="space-y-4">
-                              {customer.notes.length === 0 ? (
-                                <p className="text-center text-sm text-gray-500">
-                                  No communication history
-                                </p>
-                              ) : (
-                                customer.notes.map((note) => (
-                                  <div key={note.id} className="flex gap-3 border-b pb-3 last:border-0">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                                      {getNoteIcon(note.type)}
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-sm">{note.userName}</p>
-                                        <Badge variant="outline" className="text-xs">
-                                          {note.type}
-                                        </Badge>
-                                        <span className="text-xs text-gray-500">
-                                          {new Date(note.createdAt).toLocaleString()}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 text-sm text-gray-700">{note.content}</p>
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                            </TabsContent>
-                          </Tabs>
-                        </DialogContent>
-                      </Dialog>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-gray-500">
+                      No customers found
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell>{customer.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-gray-400" />
+                          <span>{customer.company}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Mail className="h-3 w-3" />
+                            <span>{customer.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <Phone className="h-3 w-3" />
+                            <span>{customer.phone}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{customer.industry}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-gray-400" />
+                          <span>{customer.region}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(customer.status)}</TableCell>
+                      <TableCell>${customer.totalValue.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedCustomer(customer)}
+                            >
+                              View Details
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-3xl">
+                            <DialogHeader>
+                              <DialogTitle>{customer.name} - {customer.company}</DialogTitle>
+                              <DialogDescription>
+                                Customer details and communication history
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Tabs defaultValue="details">
+                              <TabsList>
+                                <TabsTrigger value="details">Details</TabsTrigger>
+                                <TabsTrigger value="history">Communication History</TabsTrigger>
+                              </TabsList>
+                              <TabsContent value="details" className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-gray-500">Email</p>
+                                    <p className="text-sm">{customer.email}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Phone</p>
+                                    <p className="text-sm">{customer.phone}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Industry</p>
+                                    <p className="text-sm">{customer.industry}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Region</p>
+                                    <p className="text-sm">{customer.region}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Total Value</p>
+                                    <p className="text-sm">${customer.totalValue.toLocaleString()}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Status</p>
+                                    {getStatusBadge(customer.status)}
+                                  </div>
+                                  {customer.address && (
+                                    <div className="col-span-2">
+                                      <p className="text-sm text-gray-500">Address</p>
+                                      <p className="text-sm">{customer.address}</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-sm text-gray-500">Tags</p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {customer.tags.map((tag, idx) => (
+                                      <Badge key={idx} variant="outline">
+                                        {tag}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="history" className="space-y-4">
+                                {customer.notes.length === 0 ? (
+                                  <p className="text-center text-sm text-gray-500">
+                                    No communication history
+                                  </p>
+                                ) : (
+                                  customer.notes.map((note) => (
+                                    <div key={note.id} className="flex gap-3 border-b pb-3 last:border-0">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                                        {getNoteIcon(note.type)}
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-sm">{note.userName}</p>
+                                          <Badge variant="outline" className="text-xs">
+                                            {note.type}
+                                          </Badge>
+                                          <span className="text-xs text-gray-500">
+                                            {new Date(note.createdAt).toLocaleString()}
+                                          </span>
+                                        </div>
+                                        <p className="mt-1 text-sm text-gray-700">{note.content}</p>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </TabsContent>
+                            </Tabs>
+                          </DialogContent>
+                        </Dialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

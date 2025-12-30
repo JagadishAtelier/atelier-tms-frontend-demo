@@ -88,8 +88,8 @@ export function LeadManagement({ leads, users, currentUser }: LeadManagementProp
   const newLeads = filteredLeads.filter((l) => l.status === 'New').length;
   const qualifiedLeads = filteredLeads.filter((l) => l.status === 'Qualified').length;
   const wonLeads = filteredLeads.filter((l) => l.status === 'Won').length;
-  const conversionRate = filteredLeads.length > 0 
-    ? ((wonLeads / filteredLeads.length) * 100).toFixed(1) 
+  const conversionRate = filteredLeads.length > 0
+    ? ((wonLeads / filteredLeads.length) * 100).toFixed(1)
     : '0';
 
   return (
@@ -317,69 +317,71 @@ export function LeadManagement({ leads, users, currentUser }: LeadManagementProp
           <CardTitle>Leads</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLeads.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-gray-500">
-                    No leads found
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredLeads.map((lead) => {
-                  const assignedUser = users.find((u) => u.id === lead.assignedTo);
-                  return (
-                    <TableRow key={lead.id}>
-                      <TableCell>{lead.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-gray-400" />
-                          <span>{lead.company}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs">
-                            <Mail className="h-3 w-3" />
-                            <span>{lead.email}</span>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-gray-500">
+                      No leads found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLeads.map((lead) => {
+                    const assignedUser = users.find((u) => u.id === lead.assignedTo);
+                    return (
+                      <TableRow key={lead.id}>
+                        <TableCell>{lead.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-gray-400" />
+                            <span>{lead.company}</span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <Phone className="h-3 w-3" />
-                            <span>{lead.phone}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-xs">
+                              <Mail className="h-3 w-3" />
+                              <span>{lead.email}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <Phone className="h-3 w-3" />
+                              <span>{lead.phone}</span>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{lead.source}</Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
-                      <TableCell>
-                        {lead.value ? `$${lead.value.toLocaleString()}` : '-'}
-                      </TableCell>
-                      <TableCell>{assignedUser?.name || 'Unassigned'}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{lead.source}</Badge>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(lead.status)}</TableCell>
+                        <TableCell>
+                          {lead.value ? `$${lead.value.toLocaleString()}` : '-'}
+                        </TableCell>
+                        <TableCell>{assignedUser?.name || 'Unassigned'}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm">
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

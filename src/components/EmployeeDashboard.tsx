@@ -656,7 +656,7 @@ export function EmployeeDashboard({
 
   // ---------- Render ----------
   return (
-    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+    <div className="space-y-6 p-1 lg:p-3 bg-gray-50 min-h-screen">
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -666,7 +666,7 @@ export function EmployeeDashboard({
           </p>
         </div>
         <div className="text-right">
-          <div className="text-3xl text-gray-900">{formatTime(currentTime)}</div>
+          <div className="text-lg lg:text-3xl text-gray-900">{formatTime(currentTime)}</div>
           <p className="text-gray-400 text-sm mt-1">Current Time</p>
         </div>
       </div>

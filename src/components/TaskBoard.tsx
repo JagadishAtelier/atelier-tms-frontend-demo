@@ -655,7 +655,7 @@ export function TaskBoard({
           <p className="text-gray-500">Loading tasks...</p>
         </div>
       ) : viewMode === "board" ? (
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {columns.map((status) => {
             const columnTasks = getTasksByStatus(status);
             return (
