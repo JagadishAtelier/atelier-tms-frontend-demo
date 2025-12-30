@@ -87,8 +87,10 @@ export const getVapidPublicKeyApi = () =>
 /**
  * Subscribe to push notifications
  */
-export const subscribeToPushApi = (subscription: PushSubscription) =>
-    API.post<{ data: any }>("/push/subscribe", { subscription });
+export const subscribeToPushApi = (subscription: PushSubscription | PushSubscriptionJSON) =>
+    API.post<{ data: any }>("/push/subscribe", {
+        subscription: subscription instanceof PushSubscription ? subscription.toJSON() : subscription
+    });
 
 /**
  * Unsubscribe from push notifications

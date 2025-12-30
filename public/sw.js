@@ -18,8 +18,8 @@ self.addEventListener('push', function(event) {
         
         const options = {
           body: body,
-          icon: data.icon || '/icon-192x192.png',
-          badge: data.badge || '/badge-72x72.png',
+          icon: data.icon || '/icon-192x192.svg',
+          badge: data.badge || '/badge-72x72.svg',
           data: data.data || {},
           vibrate: [100, 50, 100],
           actions: data.actions || [],
@@ -38,8 +38,8 @@ self.addEventListener('push', function(event) {
         
         const options = {
           body: textData,
-          icon: '/icon-192x192.png',
-          badge: '/badge-72x72.png',
+          icon: '/icon-192x192.svg',
+          badge: '/badge-72x72.svg',
           vibrate: [100, 50, 100],
           tag: 'notification',
           requireInteraction: false
@@ -56,8 +56,8 @@ self.addEventListener('push', function(event) {
       event.waitUntil(
         self.registration.showNotification('New Notification', {
           body: 'You have a new notification',
-          icon: '/icon-192x192.png',
-          badge: '/badge-72x72.png'
+          icon: '/icon-192x192.svg',
+          badge: '/badge-72x72.svg'
         })
       );
     }
