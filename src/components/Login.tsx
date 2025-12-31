@@ -1,3 +1,4 @@
+// src/components/Login.tsx
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -12,9 +13,11 @@ import {
 import { loginApi, forgotPasswordApi, resetPasswordApi } from "./service/auth";
 import type { User } from "../types";
 import { Eye, EyeOff } from "lucide-react";
+import LoadingPage from "./loading";
 
 interface LoginProps {
   onLogin: (user: User) => void;
+  users?: User[]; // optional users prop (kept to support quickLogin usage)
 }
 
 export function Login({ onLogin, users }: LoginProps) {
@@ -28,7 +31,6 @@ export function Login({ onLogin, users }: LoginProps) {
   const [success, setSuccess] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +92,17 @@ export function Login({ onLogin, users }: LoginProps) {
     }
   };
 
-  const quickLogin = (role: string) => { const user = users.find((u) => u.role === role && u.isActive); if (user) { onLogin(user); } }
+  const quickLogin = (role: string) => {
+    const user = users?.find((u) => u.role === role && u.isActive);
+    if (user) {
+      onLogin(user);
+    }
+  };
+
+  // === NEW: show LoadingPage while `loading` is true ===
+  if (loading) {
+    return <LoadingPage />;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
@@ -139,7 +151,7 @@ export function Login({ onLogin, users }: LoginProps) {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     className="absolute flex items-center text-gray-500 hover:text-black"
-                    style={{right:"10px",top:"50%", transform:"translateY(-50%)"}}
+                    style={{ right: "10px", top: "50%", transform: "translateY(-50%)" }}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -167,33 +179,31 @@ export function Login({ onLogin, users }: LoginProps) {
               </>
             )}
 
-
-
             {error && (
               <p className="text-sm text-red-600">{error}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading
-                ? "Please wait..."
-                : mode === "login"
-                  ? "Sign In"
-                  : mode === "forgot"
-                    ? "Send OTP"
-                    : "Reset Password"}
+            <Button type="submit" className="w-full" disabled={false}>
+              {/* button is not disabled because loading handled by LoadingPage early return */}
+              {mode === "login"
+                ? "Sign In"
+                : mode === "forgot"
+                  ? "Send OTP"
+                  : "Reset Password"}
             </Button>
 
           </form>
 
-          <div className="mt-6 border-t pt-6"> {mode === "login" && (
-            <button
-              type="button"
-              onClick={() => setMode("forgot")}
-              className="text-sm text-blue-600 hover:underline text-center w-full"
-            >
-              Forgot password?
-            </button>
-          )}
+          <div className="mt-6 border-t pt-6">
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => setMode("forgot")}
+                className="text-sm text-blue-600 hover:underline text-center w-full"
+              >
+                Forgot password?
+              </button>
+            )}
 
             {mode !== "login" && (
               <button
@@ -216,3 +226,5 @@ export function Login({ onLogin, users }: LoginProps) {
     </div>
   );
 }
+
+export default Login;

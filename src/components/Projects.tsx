@@ -15,6 +15,7 @@ import {
   Clock,
   X,
 } from "lucide-react";
+import Loading from "./loading";
 
 import type { Task, User } from "../types";
 import {
@@ -58,6 +59,8 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  const isEmployee = currentUser?.role === "employee";
 
   /* -------------------------
      Fetch projects (robust)
@@ -271,11 +274,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
      Loading UI
   ------------------------- */
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-gray-500">Loading projects...</CardContent>
-      </Card>
-    );
+    return Loading();
   }
 
   /* -------------------------
@@ -529,21 +528,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium">Status</label>
-                    <select
-                      value={createForm.status}
-                      onChange={(e) => handleCreateChange("status", e.target.value)}
-                      className="mt-1 w-full rounded-md border p-2"
-                    >
-                      <option>Not Started</option>
-                      <option>Active</option>
-                      <option>In Progress</option>
-                      <option>On Hold</option>
-                      <option>Completed</option>
-                      <option>Cancelled</option>
-                    </select>
-                  </div>
+                  
 
                   <div>
                     <label className="block text-sm font-medium">Project Lead</label>
@@ -605,6 +590,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                     type="date"
                     value={selectedProject.start_date ? new Date(selectedProject.start_date).toISOString().slice(0, 10) : ""}
                     onChange={(e) => setSelectedProject((s) => s ? { ...s, start_date: e.target.value } : s)}
+                    disabled={isEmployee}
                   />
                 </div>
                 <div>
@@ -613,51 +599,65 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                     type="date"
                     value={selectedProject.end_date ? new Date(selectedProject.end_date).toISOString().slice(0, 10) : ""}
                     onChange={(e) => setSelectedProject((s) => s ? { ...s, end_date: e.target.value } : s)}
+                    disabled={isEmployee}
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium">Status</label>
-                <select
-                  value={selectedProject.status ?? ""}
-                  onChange={(e) => setSelectedProject((s) => s ? { ...s, status: e.target.value } : s)}
-                  className="mt-1 w-full rounded-md border p-2"
-                >
-                  <option>Not Started</option>
-                  <option>Active</option>
-                  <option>In Progress</option>
-                  <option>On Hold</option>
-                  <option>Completed</option>
-                  <option>Cancelled</option>
-                </select>
+                {!isEmployee ? (
+                  <select
+                    value={selectedProject.status ?? ""}
+                    onChange={(e) => setSelectedProject((s) => s ? { ...s, status: e.target.value } : s)}
+                    className="mt-1 w-full rounded-md border p-2"
+                  >
+                    <option>Not Started</option>
+                    <option>Active</option>
+                    <option>In Progress</option>
+                    <option>On Hold</option>
+                    <option>Completed</option>
+                    <option>Cancelled</option>
+                  </select>
+                ) : (
+                  <div className="mt-1 rounded-md border p-2 bg-gray-50 text-sm">
+                    {selectedProject.status ?? "—"}
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium">Project Lead</label>
-                <select
-                  value={createForm.project_lead}
-                  onChange={(e) => handleCreateChange("project_lead", e.target.value)}
-                  className="mt-1 w-full rounded-md border p-2"
-                  required
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} {emp.department ? `(${emp.department})` : ""}
-                    </option>
-                  ))}
-                </select>
+                {!isEmployee ? (
+                  <select
+                    value={createForm.project_lead}
+                    onChange={(e) => handleCreateChange("project_lead", e.target.value)}
+                    className="mt-1 w-full rounded-md border p-2"
+                    required
+                  >
+                    <option value="">Select Employee</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} {emp.department ? `(${emp.department})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="mt-1 rounded-md border p-2 bg-gray-50 text-sm">
+                    {employees.find((emp) => emp.id === selectedProject.project_lead)?.name ?? "—"}
+                  </div>
+                )}
               </div>
 
 
               <div>
-                <label className="block text-sm font-medium">Description</label>
+                <label className="block text-sm font medium">Description</label>
                 <textarea
                   value={selectedProject.description ?? ""}
                   onChange={(e) => setSelectedProject((s) => s ? { ...s, description: e.target.value } : s)}
                   className="mt-1 w-full rounded-md border p-2"
                   rows={3}
+                  readOnly={isEmployee}
                 />
               </div>
 
@@ -668,7 +668,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                 </div>
 
                 <div className="flex gap-2">
-                  {(currentUser.role === "Super Admin" || currentUser.role === "Admin") && (
+                  {(currentUser.role === "Super Admin" || currentUser.role === "Admin") && !isEmployee && (
                     <>
                       <Button
                         variant="destructive"
@@ -713,3 +713,5 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
     </div>
   );
 }
+
+export default Projects;

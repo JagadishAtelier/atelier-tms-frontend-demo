@@ -30,6 +30,7 @@ import {
 } from 'recharts';
 import type { User } from '../types';
 import { getAdminDashboardApi } from './service/dashboardService';
+import Loading from './loading';
 
 interface DashboardProps {
   currentUser: User;
@@ -63,12 +64,7 @@ export function Dashboard({ currentUser, onNavigate }: DashboardProps) {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading dashboard...</span>
-      </div>
-    );
+    return Loading();
   }
 
   if (error) {
