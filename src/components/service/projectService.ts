@@ -2,7 +2,7 @@
 import axios from "axios";
 
 /**
- * Project Type (adjust if you already have a shared type)
+ * Project Type
  */
 export interface Project {
   id: string;
@@ -17,6 +17,33 @@ export interface Project {
   is_active: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * 🔹 Project Time Report Types
+ */
+export interface ProjectTimeByDateEmployee {
+  employee_id: string;
+  employee_name: string;
+  work_date: string; // YYYY-MM-DD
+  total_hours: number;
+}
+
+export interface ProjectEmployeeTotal {
+  employee_id: string;
+  employee_name: string;
+  task_total_hours: number;
+}
+
+export interface ProjectTimeReport {
+  project: Project;
+  perDateEmployee: ProjectTimeByDateEmployee[];
+  perEmployeeTaskTotals: ProjectEmployeeTotal[];
+  projectTotals: {
+    total_from_timings: number;
+    total_from_task_hours: number;
+    grand_total: number;
+  };
 }
 
 /**
@@ -95,5 +122,30 @@ export const deleteProjectApi = async (id: string) => {
  */
 export const restoreProjectApi = async (id: string) => {
   const res = await API.patch(`/${id}/restore`);
+  return res.data;
+};
+
+/* ============================
+   📊 REPORT APIs
+============================ */
+
+/**
+ * ✅ Get Project Time Report (date-wise & employee-wise)
+ *
+ * @param projectId - Project UUID
+ * @param params.from - YYYY-MM-DD (optional)
+ * @param params.to   - YYYY-MM-DD (optional)
+ *
+ * Example:
+ * getProjectTimeReportApi("uuid", { from: "2025-01-01", to: "2025-01-31" })
+ */
+export const getProjectTimeReportApi = async (
+  projectId: string,
+  params?: {
+    from?: string;
+    to?: string;
+  }
+): Promise<ProjectTimeReport> => {
+  const res = await API.get(`/${projectId}/time-report`, { params });
   return res.data;
 };
