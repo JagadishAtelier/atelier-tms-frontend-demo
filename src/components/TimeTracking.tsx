@@ -1,15 +1,16 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Progress } from './ui/progress';
+// src/components/TimeTracking.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Progress } from "./ui/progress";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
+} from "./ui/select";
 import {
   Table,
   TableBody,
@@ -17,79 +18,176 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from './ui/table';
-import { Play, Pause, Clock, Calendar, TrendingUp } from 'lucide-react';
-import type { Task, TimeEntry, User } from '../types';
+} from "./ui/table";
+import { Play, Pause, Clock, Calendar, TrendingUp } from "lucide-react";
 
+import type { Task, TimeEntry, User } from "../types";
+import {
+  getAttendancesApi,
+  getAttendancesByEmployeeApi,
+  getTodayAttendanceApi,
+  createAttendanceApi,
+  Attendance as APIAttendance,
+} from "../components/service/attendanceService";
+
+/**
+ * Props expected by the component
+ */
 interface TimeTrackingProps {
   tasks: Task[];
-  timeEntries: TimeEntry[];
+  timeEntries: TimeEntry[]; // existing time entries (taskId, startTime, endTime, duration, notes)
   currentUser: User;
+}
+
+/**
+ * Helper: normalize various backend shapes to an attendance array
+ */
+function normalizeAttendanceResponse(res: any): APIAttendance[] {
+  // patterns seen:
+  // 1) res  === array
+  // 2) res.data === array
+  // 3) res.data.data === array
+  // 4) res.data.rows === array
+  if (!res) return [];
+
+  if (Array.isArray(res.data?.data)) return res.data.data;
+  
+  return [];
+}
+
+/**
+ * Parse a single attendance row into a friendly shape
+ */
+function parseAttendance(a: APIAttendance) {
+  const checkTimes = Array.isArray(a.check_time) ? a.check_time : [];
+  const signIn = a.sign_in ?? (checkTimes[0]?.check_in ?? null);
+  const signOut = a.sign_out ?? (checkTimes.length ? checkTimes[checkTimes.length - 1]?.check_out ?? null : null);
+  return {
+    id: a.id,
+    employee_id: a.employee_id,
+    date: a.date,
+    sign_in: signIn,
+    sign_out: signOut,
+    duration_hours: typeof a.duration_hours === "number" ? a.duration_hours : (a.duration_hours ? Number(a.duration_hours) : 0),
+    check_time: checkTimes,
+    raw: a,
+  };
 }
 
 export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingProps) {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [selectedTask, setSelectedTask] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [selectedTask, setSelectedTask] = useState<string>("all");
 
-  // Filter tasks for current user
+  const [attToday, setAttToday] = useState<any[]>([]);
+  const [attWeek, setAttWeek] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const today = new Date().toISOString().split("T")[0];
+
+  // compute week range (7 days back inclusive)
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 6); // last 7 days (including today)
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+
+  useEffect(() => {
+    fetchAttendanceForUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
+  async function fetchAttendanceForUser() {
+    if (!currentUser?.id) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      // fetch today's attendance WITHOUT employee filter
+      const todayRes = await getAttendancesApi({ from_date: today, to_date: today, limit: 50 });
+      const todayArr = normalizeAttendanceResponse(todayRes);
+      setAttToday(todayArr.map(parseAttendance));
+
+      // fetch week range (from weekStartStr to today) WITHOUT employee filter
+      const weekRes = await getAttendancesApi({ from_date: weekStartStr, to_date: today, limit: 500 });
+      const weekArr = normalizeAttendanceResponse(weekRes);
+      setAttWeek(weekArr.map(parseAttendance));
+    } catch (err: any) {
+      console.error("Failed to fetch attendance:", err);
+      setError(err?.message || "Failed to fetch attendance");
+      setAttToday([]);
+      setAttWeek([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Total attendance hours for today using attendanceService result
+  const attendanceHoursToday = useMemo(() => {
+    if (!attToday || attToday.length === 0) {
+      // fallback to summing timeEntries for today
+      const todayEntries = timeEntries.filter((e) => e.startTime.startsWith(today));
+      return todayEntries.reduce((s, e) => s + (e.duration || 0), 0);
+    }
+    return attToday.reduce((s, a) => s + (a.duration_hours || 0), 0);
+  }, [attToday, timeEntries, today]);
+
+  // Total attendance hours for week
+  const attendanceHoursWeek = useMemo(() => {
+    if (!attWeek || attWeek.length === 0) {
+      // fallback to timeEntries in last 7 days
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 6);
+      const weekEntries = timeEntries.filter((e) => new Date(e.startTime) >= weekAgo);
+      return weekEntries.reduce((s, e) => s + (e.duration || 0), 0);
+    }
+    return attWeek.reduce((s, a) => s + (a.duration_hours || 0), 0);
+  }, [attWeek, timeEntries]);
+
+  // Tasks filtered for the current user (same logic you had)
   const myTasks = tasks.filter(
     (task) =>
-      currentUser.role === 'Super Admin' ||
-      currentUser.role === 'Admin' ||
-      task.assignedTo.includes(currentUser.id)
+      currentUser.role === "Super Admin" ||
+      currentUser.role === "Admin" ||
+      (Array.isArray(task.assignedTo) && task.assignedTo.includes(currentUser.id))
   );
 
-  // Filter time entries
-  const myTimeEntries = timeEntries.filter((entry) => entry.userId === currentUser.id);
-
-  // Calculate total time today
-  const today = new Date().toISOString().split('T')[0];
-  const todayEntries = myTimeEntries.filter((entry) =>
-    entry.startTime.startsWith(today)
-  );
-  const totalTimeToday = todayEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
-
-  // Calculate total time this week
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekEntries = myTimeEntries.filter(
-    (entry) => new Date(entry.startTime) > weekAgo
-  );
-  const totalTimeWeek = weekEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
-
-  // Get tasks with time tracking
+  // Build tasksWithTime from timeEntries (task-specific)
   const tasksWithTime = myTasks.map((task) => {
-    const taskEntries = myTimeEntries.filter((entry) => entry.taskId === task.id);
-    const totalTime = taskEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
+    const taskEntries = timeEntries.filter((te) => te.taskId === task.id && te.userId === currentUser.id);
+    const totalTime = taskEntries.reduce((s, e) => s + (e.duration || 0), 0);
+    const estimated = (task.estimatedTime ?? 0);
+    const progress = estimated > 0 ? (totalTime / estimated) * 100 : 0;
     return {
       ...task,
       actualTimeSpent: totalTime,
-      timeProgress: task.estimatedTime ? (totalTime / task.estimatedTime) * 100 : 0,
+      timeProgress: progress,
     };
   });
 
+  // Timer control (local)
   const handleStartTimer = (taskId: string) => {
     setActiveTaskId(taskId);
-    console.log('Timer started for task:', taskId);
+    console.log("Timer started for task:", taskId);
+    // optionally integrate with your backend time-entry API here
   };
 
   const handleStopTimer = () => {
-    console.log('Timer stopped for task:', activeTaskId);
+    console.log("Timer stopped for task:", activeTaskId);
     setActiveTaskId(null);
+    // optionally create time entry on backend here
   };
 
   const getTaskStatus = (task: Task) => {
-    if (task.status === 'Completed') return 'default';
-    if (task.status === 'In Progress') return 'secondary';
-    return 'outline';
+    if (task.status === "Completed") return "default";
+    if (task.status === "In Progress") return "secondary";
+    return "outline";
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1>Time Tracking</h1>
+        <h1 className="text-2xl font-semibold">Time Tracking</h1>
         <p className="text-gray-500">Track time spent on tasks and projects</p>
       </div>
 
@@ -101,8 +199,9 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{totalTimeToday.toFixed(1)}h</div>
-            <Progress value={(totalTimeToday / 8) * 100} className="mt-2" />
+            <div className="text-2xl">{attendanceHoursToday.toFixed(1)}h</div>
+            <Progress value={Math.min((attendanceHoursToday / 8) * 100, 100)} className="mt-2" />
+            <p className="text-xs text-gray-500 mt-2">From attendance records</p>
           </CardContent>
         </Card>
 
@@ -112,10 +211,8 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
             <Calendar className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{totalTimeWeek.toFixed(1)}h</div>
-            <p className="text-xs text-gray-500">
-              Avg: {(totalTimeWeek / 5).toFixed(1)}h per day
-            </p>
+            <div className="text-2xl">{attendanceHoursWeek.toFixed(1)}h</div>
+            <p className="text-xs text-gray-500">Last 7 days (attendance)</p>
           </CardContent>
         </Card>
 
@@ -125,15 +222,13 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
             <TrendingUp className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">
-              {myTasks.filter((t) => t.status === 'In Progress').length}
-            </div>
+            <div className="text-2xl">{myTasks.filter((t) => t.status === "In Progress").length}</div>
             <p className="text-xs text-gray-500">Being tracked</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Active Timer */}
+      {/* Active Timer (local) */}
       {activeTaskId && (
         <Card className="border-blue-600">
           <CardHeader>
@@ -147,9 +242,7 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm">
-                  {myTasks.find((t) => t.id === activeTaskId)?.title}
-                </p>
+                <p className="text-sm">{myTasks.find((t) => t.id === activeTaskId)?.title}</p>
                 <p className="text-2xl">00:00:00</p>
               </div>
               <Button variant="destructive" onClick={handleStopTimer}>
@@ -157,6 +250,35 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
                 Stop Timer
               </Button>
             </div>
+
+            {/* show today's attendance sessions (if any) */}
+            {attToday.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium">Today's Attendance Sessions</h4>
+                <div className="mt-2">
+                  {attToday[0].check_time && attToday[0].check_time.length > 0 ? (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="text-left">Check In</th>
+                          <th className="text-left">Check Out</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attToday[0].check_time.map((s: any, i: number) => (
+                          <tr key={i}>
+                            <td className="py-1">{s.check_in ?? "-"}</td>
+                            <td className="py-1">{s.check_out ?? "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-sm text-gray-500">No sessions recorded</div>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -175,6 +297,7 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
                 <SelectItem value="monthly">Monthly</SelectItem>
               </SelectContent>
             </Select>
+
             <Select value={selectedTask} onValueChange={setSelectedTask}>
               <SelectTrigger className="w-60">
                 <SelectValue placeholder="All Tasks" />
@@ -192,140 +315,8 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
         </CardContent>
       </Card>
 
-      {/* Task Time Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Task Time Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Time Spent</TableHead>
-                  <TableHead>Estimated</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tasksWithTime.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500">
-                      No tasks with time tracking
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  tasksWithTime.map((task) => (
-                    <TableRow key={task.id}>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm">{task.title}</p>
-                          <p className="text-xs text-gray-500">{task.project}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getTaskStatus(task)}>{task.status}</Badge>
-                      </TableCell>
-                      <TableCell>{task.actualTimeSpent.toFixed(1)}h</TableCell>
-                      <TableCell>{task.estimatedTime || 0}h</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress
-                            value={Math.min(task.timeProgress, 100)}
-                            className="w-24"
-                          />
-                          <span className="text-xs text-gray-500">
-                            {task.timeProgress.toFixed(0)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {activeTaskId === task.id ? (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={handleStopTimer}
-                          >
-                            <Pause className="mr-1 h-3 w-3" />
-                            Stop
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleStartTimer(task.id)}
-                            disabled={task.status === 'Completed'}
-                          >
-                            <Play className="mr-1 h-3 w-3" />
-                            Start
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Time Entries Log */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Time Entries</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>End Time</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {myTimeEntries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-gray-500">
-                      No time entries recorded
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  myTimeEntries.slice(0, 10).map((entry) => {
-                    const task = myTasks.find((t) => t.id === entry.taskId);
-                    return (
-                      <TableRow key={entry.id}>
-                        <TableCell>
-                          <p className="text-sm">{task?.title || 'Unknown Task'}</p>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(entry.startTime).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          {entry.endTime
-                            ? new Date(entry.endTime).toLocaleString()
-                            : 'In Progress'}
-                        </TableCell>
-                        <TableCell>{entry.duration?.toFixed(1) || '-'}h</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {entry.notes || '-'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      
 
       {/* Timesheet Summary */}
       <Card>
@@ -337,26 +328,13 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
             <div className="space-y-2">
               <h3 className="text-sm">Daily Breakdown</h3>
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Monday</span>
-                  <span>8.5h</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tuesday</span>
-                  <span>7.2h</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Wednesday</span>
-                  <span>8.0h</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Thursday</span>
-                  <span>9.1h</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Friday</span>
-                  <span>7.8h</span>
-                </div>
+                {/* Example: render last 5 days from attWeek */}
+                {attWeek.slice(-5).map((d: any) => (
+                  <div key={d.date} className="flex justify-between">
+                    <span className="text-gray-600">{d.date}</span>
+                    <span>{(d.duration_hours || 0).toFixed(1)}h</span>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="space-y-2">
@@ -364,10 +342,7 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
               <div className="space-y-1 text-sm">
                 {Array.from(new Set(myTasks.map((t) => t.project))).map((project) => {
                   const projectTasks = tasksWithTime.filter((t) => t.project === project);
-                  const projectTime = projectTasks.reduce(
-                    (sum, t) => sum + t.actualTimeSpent,
-                    0
-                  );
+                  const projectTime = projectTasks.reduce((sum, t) => sum + t.actualTimeSpent, 0);
                   return (
                     <div key={project} className="flex justify-between">
                       <span className="text-gray-600">{project}</span>
@@ -380,6 +355,11 @@ export function TimeTracking({ tasks, timeEntries, currentUser }: TimeTrackingPr
           </div>
         </CardContent>
       </Card>
+
+      {loading && <div className="text-sm text-gray-500">Loading attendance...</div>}
+      {error && <div className="text-sm text-red-600">Error: {error}</div>}
     </div>
   );
 }
+
+export default TimeTracking;
