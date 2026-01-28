@@ -1,5 +1,4 @@
-// src/components/Projects.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -14,7 +13,11 @@ import {
   CheckCircle,
   Clock,
   X,
+  Paperclip,
 } from "lucide-react";
+import { Linkify } from "./ui/linkify";
+import { TaskDetails } from "./TaskDetails";
+import { MultiSelect } from "./ui/multi-select";
 
 import type { Task, User } from "../types";
 import {
@@ -24,20 +27,14 @@ import {
   updateProjectApi,
   deleteProjectApi,
 } from "../components/service/projectService";
+import { getTaskByProjectApi } from "../components/service/task";
+import type { Task as ServiceTask } from "../components/service/task";
 import type { Project } from "../components/service/projectService";
 import {
   getEmployeesApi,
   type Employee,
 } from "../components/service/employeeService";
 
-/**
- * Projects UI with Create & View/Edit modals
- *
- * Props:
- *  - tasks: Task[]
- *  - users: User[] (used for project_lead select)
- *  - currentUser: User (for role checks)
- */
 interface ProjectsProps {
   tasks: Task[];
   users: User[];
@@ -45,10 +42,15 @@ interface ProjectsProps {
 }
 
 export function Projects({ tasks, users, currentUser }: ProjectsProps) {
+  const [createFile, setCreateFile] = useState<File | null>(null);
+  const [editFile, setEditFile] = useState<File | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
+
+  // Dashboard Stats
+  const [stats, setStats] = useState({ total: 0, active: 0, onHold: 0, completed: 0 });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] =
@@ -59,20 +61,66 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
+  // View Tasks State
+  const [viewTasksOpen, setViewTasksOpen] = useState(false);
+  const [viewTasksProject, setViewTasksProject] = useState<Project | null>(null);
+  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+
+  // Task Detail State (for viewing task details from project tasks)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  /* -------------------------
+     Status Derivation
+  ------------------------- */
+  const deriveProjectStatus = (project: Project): string => {
+    const tasks = (project as any).tasks || [];
+    if (tasks.length === 0) return project.status || "Not Started";
+
+    if (tasks.some((t: any) => t.status === "On Hold")) return "On Hold";
+
+    const allCompleted = tasks.every((t: any) => t.status === "Completed");
+    if (allCompleted) return "Completed";
+
+    const allNotStarted = tasks.every((t: any) => ["Not Started", "To Do"].includes(t.status));
+    if (allNotStarted) return "Not Started";
+
+    return "In Progress";
+  };
+
   /* -------------------------
      Fetch projects (robust)
   ------------------------- */
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getProjectsApi();
+      // Fetch ALL projects matching search (ignore backend status filter to ensure derived statuses work)
+      const res = await getProjectsApi({
+        search: searchTerm,
+        limit: 1000
+      });
+
       // Normalize various API shapes:
-      const projectsArray =
+      let projectsArray =
         Array.isArray(res) ? res :
           Array.isArray(res.data) ? res.data :
             Array.isArray(res.data?.data) ? res.data.data :
               Array.isArray(res.rows) ? res.rows :
                 [];
+
+      // Client-side filtering check using Derived Status
+      if (statusFilter !== "All") {
+        projectsArray = projectsArray.filter((p: any) => {
+          const derived = deriveProjectStatus(p); // Uses task logic
+
+          if (statusFilter === "Active") {
+            // Map Active filter to In Progress / Not Started
+            return derived === "In Progress" || derived === "Not Started";
+          }
+          // Exact matches for On Hold / Completed
+          return derived === statusFilter;
+        });
+      }
 
       setProjects(projectsArray);
     } catch (err) {
@@ -80,6 +128,38 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
       setProjects([]);
     } finally {
       setLoading(false);
+    }
+  }, [searchTerm, statusFilter]);
+
+
+
+  const fetchStats = async () => {
+    try {
+      // Fetch ALL projects to calculate global stats consistently
+      const res = await getProjectsApi({ limit: 1000 });
+
+      const allProjects =
+        Array.isArray(res) ? res :
+          Array.isArray(res.data) ? res.data :
+            Array.isArray(res.data?.data) ? res.data.data :
+              Array.isArray(res.rows) ? res.rows :
+                [];
+
+      const total = allProjects.length;
+      let active = 0;
+      let onHold = 0;
+      let completed = 0;
+
+      allProjects.forEach((p: any) => {
+        const s = deriveProjectStatus(p);
+        if (s === "On Hold") onHold++;
+        else if (s === "Completed") completed++;
+        else if (s === "In Progress" || s === "Not Started") active++;
+      });
+
+      setStats({ total, active, onHold, completed });
+    } catch (e) {
+      console.error("Failed to fetch stats", e);
     }
   };
 
@@ -106,60 +186,84 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
 
 
   useEffect(() => {
-    fetchProjects();
+    fetchStats();
     fetchEmployees();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProjects();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchProjects]);
+
   /* -------------------------
      Filters
   ------------------------- */
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch = (project.name ?? "")
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    // note: your backend status values might be "In Progress" etc; this component uses "Active"/"Completed"/"On Hold"
-    const matchesStatus =
-      statusFilter === "All" || (project.status ?? "") === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  /* -------------------------
+     Filters (Client side removed, now API based)
+  ------------------------- */
+  // const filteredProjects = projects; // Direct mapping
+
+
 
   /* -------------------------
      Project stats helper
   ------------------------- */
+  const parseTeamMembers = (val: any): string[] => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === "string") {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  /* -------------------------
+     Project stats calculator
+  ------------------------- */
   const getProjectStats = (project: Project) => {
-    // NOTE: your Task type should have a project field — adapt if it's projectId instead
-    const projectTasks = tasks.filter((t) => t.project === project.name);
-    const completedTasks = projectTasks.filter((t) => t.status === "Completed").length;
+    // Calculate task statistics using nested tasks from API (Project include)
+    const projectTasks = (project as any).tasks || [];
+    const completedTasks = projectTasks.filter((t: any) => t.status === "Completed").length;
     const totalTasks = projectTasks.length;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-    const teamMembers = new Set<string>();
-    projectTasks.forEach((task) => {
-      (task.assignedTo || []).forEach((id) => teamMembers.add(id));
-    });
+    // Parse team members safely
+    const members = parseTeamMembers(project.team_members);
 
     return {
+      teamSize: members.length,
       totalTasks,
       completedTasks,
       progress,
-      teamSize: teamMembers.size,
     };
   };
 
   /* -------------------------
      Badges
   ------------------------- */
+
+
   const getStatusBadge = (status?: string) => {
     switch (status) {
-      case "Active":
-        return <Badge>Active</Badge>;
-      case "On Hold":
-        return <Badge variant="secondary">On Hold</Badge>;
       case "Completed":
-        return <Badge variant="outline">Completed</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600">Completed</Badge>;
+      case "On Hold":
+        return <Badge className="bg-amber-500 hover:bg-amber-600">On Hold</Badge>;
+      case "In Progress":
+        return <Badge className="bg-blue-500 hover:bg-blue-600">In Progress</Badge>;
+      case "Active":
+        return <Badge className="bg-blue-500 hover:bg-blue-600">Active</Badge>;
+      case "Not Started":
+        return <Badge variant="secondary">Not Started</Badge>;
       default:
-        return <Badge>{status || "Unknown"}</Badge>;
+        return <Badge variant="outline">{status || "Unknown"}</Badge>;
     }
   };
 
@@ -174,6 +278,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
     given_enddate: "",
     status: "Not Started",
     project_lead: "",
+    team_members: [] as string[],
   };
 
   const [createForm, setCreateForm] = useState<any>(emptyCreate);
@@ -193,26 +298,33 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Build payload to match backend (projectService expects same fields)
-      const payload: Partial<Project> = {
-        name: String(createForm.name).trim(),
-        description: createForm.description || null,
-        start_date: createForm.start_date ? new Date(createForm.start_date).toISOString() : null,
-        end_date: createForm.end_date ? new Date(createForm.end_date).toISOString() : null,
-        given_enddate: createForm.given_enddate ? new Date(createForm.given_enddate).toISOString() : null,
-        status: createForm.status,
-        project_lead: createForm.project_lead || null,
-        is_active: true,
-      };
+      const payload = new FormData();
+      payload.append("name", String(createForm.name).trim());
+      if (createForm.description) payload.append("description", createForm.description);
+      if (createForm.start_date) payload.append("start_date", new Date(createForm.start_date).toISOString());
+      if (createForm.end_date) payload.append("end_date", new Date(createForm.end_date).toISOString());
+      if (createForm.given_enddate) payload.append("given_enddate", new Date(createForm.given_enddate).toISOString());
+      if (createForm.status) payload.append("status", createForm.status);
+      if (createForm.project_lead) payload.append("project_lead", createForm.project_lead);
+      if (createForm.team_members && createForm.team_members.length > 0) {
+        payload.append("team_members", JSON.stringify(createForm.team_members));
+      }
+      payload.append("is_active", "true");
+
+      if (createFile) {
+        payload.append("document", createFile);
+      }
 
       await createProjectApi(payload);
       alert("Project created");
       setCreateOpen(false);
       setCreateForm(emptyCreate);
+      setCreateFile(null);
       fetchProjects();
+      fetchStats();
     } catch (err: any) {
       console.error("Create failed", err);
-      alert(err?.message || "Failed to create project");
+      // alert(err?.message || "Failed to create project");
     }
   };
 
@@ -225,7 +337,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
       if (typeof projectIdOrObj === "string") {
         const res = await getProjectByIdApi(projectIdOrObj);
         // normalize
-        proj = res.data ?? res;
+        proj = (res as any).data ?? res;
       } else {
         proj = projectIdOrObj;
       }
@@ -237,7 +349,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
     }
   };
 
-  const handleUpdateProject = async (updates: Partial<Project>) => {
+  const handleUpdateProject = async (updates: Partial<Project> | FormData) => {
     if (!selectedProject) return;
     try {
       await updateProjectApi(selectedProject.id, updates);
@@ -245,6 +357,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
       setViewOpen(false);
       setSelectedProject(null);
       fetchProjects();
+      fetchStats();
     } catch (err) {
       console.error("Update failed", err);
       alert("Failed to update project");
@@ -261,9 +374,48 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
       setViewOpen(false);
       setSelectedProject(null);
       fetchProjects();
+      fetchStats();
     } catch (err) {
       console.error("Delete failed", err);
       alert("Failed to delete project");
+    }
+  };
+
+  /* -------------------------
+     Permission check for viewing tasks
+  ------------------------- */
+  const canViewProjectTasks = (project: Project): boolean => {
+    // Admins and Super Admins can always view
+    if (currentUser.role === "Super Admin" || currentUser.role === "Admin") {
+      return true;
+    }
+
+    // Project lead can view their project's tasks
+    if (project.project_lead === currentUser.id || project.project_lead === (currentUser as any).employeeId) {
+      return true;
+    }
+
+    return false;
+  };
+
+
+
+  const handleViewTasks = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    setViewTasksProject(project);
+    setViewTasksOpen(true);
+    setTasksLoading(true);
+    try {
+      const res = await getTaskByProjectApi(project.id);
+      // normalize
+      // response structure: { success: true, message: "...", data: [...] }
+      const tasks = res.data && Array.isArray(res.data.data) ? res.data.data : [];
+      setProjectTasks(tasks as unknown as Task[]);
+    } catch (err) {
+      console.error("Failed to fetch project tasks", err);
+      setProjectTasks([]);
+    } finally {
+      setTasksLoading(false);
     }
   };
 
@@ -307,7 +459,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
             <FolderKanban className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{projects.length}</div>
+            <div className="text-2xl">{stats.total}</div>
           </CardContent>
         </Card>
 
@@ -317,7 +469,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
             <Clock className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{projects.filter((p) => p.status === "Active").length}</div>
+            <div className="text-2xl">{stats.active}</div>
           </CardContent>
         </Card>
 
@@ -327,7 +479,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
             <Clock className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{projects.filter((p) => p.status === "On Hold").length}</div>
+            <div className="text-2xl">{stats.onHold}</div>
           </CardContent>
         </Card>
 
@@ -337,7 +489,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
             <CheckCircle className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{projects.filter((p) => p.status === "Completed").length}</div>
+            <div className="text-2xl">{stats.completed}</div>
           </CardContent>
         </Card>
       </div>
@@ -392,7 +544,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
 
       {/* Projects Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredProjects.map((project) => {
+        {projects.map((project) => {
           const stats = getProjectStats(project);
           return (
             <Card
@@ -403,10 +555,10 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <CardTitle className="text-md font-medium truncate w-50" title={project.name}>{project.name}</CardTitle>
                     <p className="mt-1 text-sm text-gray-500">{/* optionally department */}</p>
                   </div>
-                  {getStatusBadge(project.status)}
+                  {getStatusBadge(deriveProjectStatus(project))}
                 </div>
               </CardHeader>
 
@@ -440,14 +592,20 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
 
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Users className="h-4 w-4" />
-                  <span>{stats.teamSize} team members</span>
+                  <span>{stats.teamSize + 1} team members</span>
                 </div>
 
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" size="sm" className="flex-1">
                     View Details
                   </Button>
-                  <Button variant="ghost" size="sm" className="flex-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => handleViewTasks(e, project)}
+                    disabled={!canViewProjectTasks(project)}
+                  >
                     View Tasks
                   </Button>
                 </div>
@@ -457,7 +615,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
         })}
       </div>
 
-      {filteredProjects.length === 0 && (
+      {projects.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
             <FolderKanban className="mx-auto mb-4 h-12 w-12 text-gray-400" />
@@ -561,7 +719,29 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                       ))}
                     </select>
                   </div>
+                </div>
 
+                <div>
+                  <label className="block text-sm font-medium mb-2">Team Members</label>
+                  <MultiSelect
+                    variant="inverted"
+                    options={employees.map((emp) => ({
+                      label: emp.name + (emp.department ? ` (${emp.department})` : ""),
+                      value: emp.id,
+                    }))}
+                    value={parseTeamMembers(createForm.team_members || [])}
+                    onValueChange={(selected) => handleCreateChange("team_members", selected)}
+                    placeholder="Select team members..."
+                    maxCount={2}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium">Attachment (Document)</label>
+                  <Input
+                    type="file"
+                    onChange={(e) => setCreateFile(e.target.files?.[0] || null)}
+                  />
                 </div>
               </div>
 
@@ -593,7 +773,7 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-xl font-semibold">{selectedProject.name}</h4>
-                  <p className="text-sm text-gray-600">{selectedProject.description}</p>
+                  {/* <p className="text-sm text-gray-600">{selectedProject.description}</p> */}
                 </div>
                 <div>{getStatusBadge(selectedProject.status)}</div>
               </div>
@@ -617,6 +797,36 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                 </div>
               </div>
 
+              {/* Attachments Display */}
+              {selectedProject.attachments && selectedProject.attachments.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Attachments</label>
+                  <div className="space-y-2">
+                    {selectedProject.attachments.map((att: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between rounded-lg border p-2 bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="h-4 w-4 text-gray-500" />
+                          <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                            {att.name}
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Update File Input */}
+              {(currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Manager") && (
+                <div>
+                  <label className="block text-sm font-medium">Add Attachment (Update)</label>
+                  <Input
+                    type="file"
+                    onChange={(e) => setEditFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium">Status</label>
                 <select
@@ -632,33 +842,56 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                   <option>Cancelled</option>
                 </select>
               </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium">Project Lead</label>
+                  <select
+                    value={selectedProject.project_lead || ""}
+                    onChange={(e) => setSelectedProject((s) => s ? { ...s, project_lead: e.target.value } : s)}
+                    className="mt-1 w-full rounded-md border p-2"
+                    required
+                  >
+                    <option value="">Select Employee</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} {emp.department ? `(${emp.department})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium">Project Lead</label>
-                <select
-                  value={createForm.project_lead}
-                  onChange={(e) => handleCreateChange("project_lead", e.target.value)}
-                  className="mt-1 w-full rounded-md border p-2"
-                  required
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} {emp.department ? `(${emp.department})` : ""}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Team Members</label>
+                  <MultiSelect
+                    variant="inverted"
+                    options={employees.map((emp) => ({
+                      label: emp.name + (emp.department ? ` (${emp.department})` : ""),
+                      value: emp.id,
+                    }))}
+                    value={parseTeamMembers(selectedProject.team_members || [])}
+                    onValueChange={(selected) => setSelectedProject((s) => s ? { ...s, team_members: selected } : s)}
+                    placeholder="Select team members..."
+                    maxCount={2}
+                    disabled={!(currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Manager")}
+                  />
+                </div>
               </div>
 
 
               <div>
                 <label className="block text-sm font-medium">Description</label>
-                <textarea
-                  value={selectedProject.description ?? ""}
-                  onChange={(e) => setSelectedProject((s) => s ? { ...s, description: e.target.value } : s)}
-                  className="mt-1 w-full rounded-md border p-2"
-                  rows={3}
-                />
+                {(currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Manager") ? (
+                  <textarea
+                    value={selectedProject.description ?? ""}
+                    onChange={(e) => setSelectedProject((s) => s ? { ...s, description: e.target.value } : s)}
+                    className="mt-1 w-full rounded-md border p-2"
+                    rows={3}
+                  />
+                ) : (
+                  <div className="mt-1 w-full rounded-md border p-2 min-h-[80px] bg-gray-50">
+                    <Linkify text={selectedProject.description ?? ""} />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-4">
@@ -678,17 +911,25 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                       </Button>
                       <Button
                         onClick={() => {
-                          // prepare update payload from selectedProject fields
-                          const payload: Partial<Project> = {
-                            name: selectedProject.name,
-                            description: selectedProject.description,
-                            start_date: selectedProject.start_date ? new Date(selectedProject.start_date).toISOString() : null,
-                            end_date: selectedProject.end_date ? new Date(selectedProject.end_date).toISOString() : null,
-                            given_enddate: selectedProject.given_enddate ? new Date(selectedProject.given_enddate).toISOString() : null,
-                            status: selectedProject.status,
-                            project_lead: selectedProject.project_lead,
-                          };
-                          handleUpdateProject(payload);
+                          const payload = new FormData();
+                          if (selectedProject.name) payload.append("name", selectedProject.name);
+                          if (selectedProject.description) payload.append("description", selectedProject.description);
+                          if (selectedProject.start_date) payload.append("start_date", new Date(selectedProject.start_date).toISOString());
+                          if (selectedProject.end_date) payload.append("end_date", new Date(selectedProject.end_date).toISOString());
+                          if (selectedProject.given_enddate) payload.append("given_enddate", new Date(selectedProject.given_enddate).toISOString());
+                          if (selectedProject.status) payload.append("status", selectedProject.status);
+                          if (selectedProject.project_lead) payload.append("project_lead", selectedProject.project_lead);
+                          if (selectedProject.team_members) {
+                            const parsedMembers = parseTeamMembers(selectedProject.team_members);
+                            payload.append("team_members", JSON.stringify(parsedMembers));
+                          }
+
+                          if (editFile) {
+                            payload.append("document", editFile);
+                          }
+
+                          handleUpdateProject(payload as any);
+                          setEditFile(null);
                         }}
                       >
                         Save
@@ -706,6 +947,90 @@ export function Projects({ tasks, users, currentUser }: ProjectsProps) {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------------
+           View Project Tasks Modal
+          ------------------------- */}
+      {viewTasksOpen && viewTasksProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-3xl rounded-lg bg-white shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <h3 className="text-lg font-medium">Tasks for {viewTasksProject.name}</h3>
+                <p className="text-sm text-gray-500">Overview of all tasks in this project</p>
+              </div>
+              <button onClick={() => {
+                setViewTasksOpen(false);
+                setSelectedTaskId(null);
+              }} className="p-2">
+                <X />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {selectedTaskId ? (
+                // Show TaskDetails when a task is selected
+                <TaskDetails
+                  taskId={selectedTaskId}
+                  users={users}
+                  employees={employees}
+                  currentUser={currentUser}
+                  onBack={() => setSelectedTaskId(null)}
+                />
+              ) : tasksLoading ? (
+                <div className="py-8 text-center text-gray-500">Loading tasks...</div>
+              ) : projectTasks.length === 0 ? (
+                <div className="py-8 text-center text-gray-500">
+                  <p>No tasks found for this project.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {projectTasks.map((task) => (
+                    <Card
+                      key={task.id}
+                      className="border shadow-none cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => setSelectedTaskId(task.id)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <h4 className="font-medium">{task.title}</h4>
+                            <p className="text-sm text-gray-500 line-clamp-1">{task.description}</p>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 pt-2">
+                              <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "No date"}</span>
+                              <span>Priority: {task.priority}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            {getStatusBadge(task.status)}
+                            <div className="text-xs text-gray-500">
+                              {(() => {
+                                const ids = Array.isArray(task.assigned_to) ? task.assigned_to : (task.assigned_to ? [task.assigned_to] : []);
+                                if (ids.length === 0) return "Unassigned";
+                                return "Assigned into: " + ids.map((id: string) => {
+                                  const e = employees.find((emp: any) => emp.id === id);
+                                  return e ? e.name : "Unknown";
+                                }).join(", ");
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t px-4 py-3 bg-gray-50 rounded-b-lg flex justify-end">
+              <Button onClick={() => {
+                setViewTasksOpen(false);
+                setSelectedTaskId(null);
+              }}>Close</Button>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import axios from "axios";
 import { AppNotification, NotificationListResponse, NotificationStats } from "../../types/notification";
 
 const API = axios.create({
-    baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/notifications",
+    baseURL: `${import.meta.env.VITE_API_BASE_URL}/tms/notifications`,
 });
 
 /**

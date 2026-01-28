@@ -17,13 +17,15 @@ export interface Project {
   is_active: boolean;
   createdAt?: string;
   updatedAt?: string;
+  attachments?: { name: string; url: string; type: string; key?: string }[];
+  team_members?: string[]; // Array of employee IDs
 }
 
 /**
  * Axios instance
  */
 const API = axios.create({
-  baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/project/project",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/tms/project/project`,
 });
 
 /**
@@ -66,8 +68,11 @@ export const getProjectByIdApi = async (id: string): Promise<Project> => {
 /**
  * Create project
  */
-export const createProjectApi = async (data: Partial<Project>) => {
-  const res = await API.post("/", data);
+export const createProjectApi = async (data: Partial<Project> | FormData) => {
+  const isFormData = data instanceof FormData;
+  const headers = isFormData ? { "Content-Type": "multipart/form-data" } : undefined;
+
+  const res = await API.post("/", data, { headers });
   return res.data;
 };
 
@@ -76,9 +81,12 @@ export const createProjectApi = async (data: Partial<Project>) => {
  */
 export const updateProjectApi = async (
   id: string,
-  data: Partial<Project>
+  data: Partial<Project> | FormData
 ) => {
-  const res = await API.put(`/${id}`, data);
+  const isFormData = data instanceof FormData;
+  const headers = isFormData ? { "Content-Type": "multipart/form-data" } : undefined;
+
+  const res = await API.put(`/${id}`, data, { headers });
   return res.data;
 };
 

@@ -22,7 +22,7 @@ export interface Employee {
  * Axios instance
  */
 const API = axios.create({
-  baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/employee/employee",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/tms/employee/employee`,
 });
 
 /**

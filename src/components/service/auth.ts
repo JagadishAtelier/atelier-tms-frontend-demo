@@ -2,7 +2,7 @@ import axios from "axios";
 import type { User } from "../../types";
 
 const API = axios.create({
-  baseURL: "https://tms-be-kst3.onrender.com/api/v1/user", // adjust port
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/user`, // adjust port
 });
 
 interface LoginResponse {

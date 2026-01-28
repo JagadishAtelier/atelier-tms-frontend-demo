@@ -17,9 +17,10 @@ import {
   Circle,
   Paperclip,
   Edit2,
+  X,
 } from "lucide-react";
 import type { Task, User as UserType, TaskStatus, TaskPriority } from "../types";
-import { getTaskByIdApi, updateTaskApi } from "./service/task";
+import { getTaskByIdApi, updateTaskApi, getTaskDiscussionsApi, addTaskDiscussionApi, type TaskDiscussion } from "./service/task";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "./ui/select";
 import {
   Dialog,
@@ -29,11 +30,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
+import { Linkify } from "./ui/linkify";
 
 interface TaskDetailsProps {
   task?: Task;
   taskId?: string;
-  users: UserType[]; // used for lookup and assigned_to options
+  users: UserType[]; // used for lookup
+  employees?: any[]; // additional lookup
   currentUser: UserType;
   onBack: () => void;
 }
@@ -42,6 +45,7 @@ export function TaskDetails({
   task: propTask,
   taskId,
   users,
+  employees = [],
   currentUser,
   onBack,
 }: TaskDetailsProps) {
@@ -54,6 +58,11 @@ export function TaskDetails({
   const [isStatusEditOpen, setIsStatusEditOpen] = useState(false);
   const [editStatusValue, setEditStatusValue] = useState<TaskStatus>("Not Started");
   const [savingStatus, setSavingStatus] = useState(false);
+  // Discussions State
+  const [discussions, setDiscussions] = useState<TaskDiscussion[]>([]);
+  const [discussionMessage, setDiscussionMessage] = useState("");
+  const [discussionFile, setDiscussionFile] = useState<File | null>(null);
+  const [sendingDiscussion, setSendingDiscussion] = useState(false);
 
   // Fetch task if only taskId is provided
   useEffect(() => {
@@ -92,7 +101,9 @@ export function TaskDetails({
         description: taskData.description ?? "",
         status: (taskData.status as TaskStatus) ?? "Not Started",
         priority: (taskData.priority as TaskPriority) ?? "Medium",
-        assignedTo: taskData.assigned_to ?? taskData.assignee?.id ?? "",
+        assignedTo: Array.isArray(taskData.assigned_to) 
+          ? taskData.assigned_to 
+          : (taskData.assigned_to ? [taskData.assigned_to] : (taskData.assignee?.id ? [taskData.assignee.id] : [])),
         assignedBy: taskData.created_by ?? undefined,
         createdAt: taskData.createdAt ?? taskData.created_at ?? new Date().toISOString(),
         dueDate: taskData.due_date_and_time ?? null,
@@ -112,10 +123,48 @@ export function TaskDetails({
       };
 
       setTask(mappedTask);
+      if (!silentBackground) {
+        fetchDiscussions(); // Fetch discussions after task is loaded
+      }
     } catch (error) {
       console.error("Failed to fetch task:", error);
     } finally {
       if (!silentBackground) setLoading(false);
+    }
+  }
+
+  async function fetchDiscussions() {
+    if (!taskId) return;
+    try {
+      const discRes = await getTaskDiscussionsApi(taskId);
+      setDiscussions(extractResponseData(discRes) || []);
+    } catch (err) {
+      console.error("Failed to load discussions", err);
+    }
+  }
+
+  async function handleSendDiscussion(e: React.FormEvent) {
+    e.preventDefault();
+    if (!taskId || (!discussionMessage.trim() && !discussionFile)) return;
+
+    setSendingDiscussion(true);
+    try {
+      const formData = new FormData();
+      formData.append("task_id", taskId);
+      formData.append("message", discussionMessage);
+      if (discussionFile) {
+        formData.append("file", discussionFile);
+      }
+
+      await addTaskDiscussionApi(formData);
+      setDiscussionMessage("");
+      setDiscussionFile(null);
+      await fetchDiscussions(); // Refresh discussions
+    } catch (err: any) {
+      console.error("Failed to send discussion:", err);
+      alert(err?.response?.data?.message || "Failed to send discussion");
+    } finally {
+      setSendingDiscussion(false);
     }
   }
 
@@ -141,12 +190,21 @@ export function TaskDetails({
   }
 
   // lookups
-  const assignedUserName =
-    task.assignee?.name ??
-    (() => {
-      const u = users.find((u) => String(u.id) === String(task.assignedTo));
-      return u ? u.username || u.email : "Unassigned";
-    })();
+  const assignedUsers = (() => {
+      const ids = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : []);
+      if (ids.length === 0) return [];
+      
+      return ids.map(id => {
+         // Check employees first, then users
+         const emp = employees.find((e: any) => String(e.id) === String(id));
+         if (emp) return { name: emp.name ?? emp.email, id };
+         
+         const u = users.find((u) => String(u.id) === String(id));
+         if (u) return { name: u.username ?? u.email, id };
+         
+         return { name: "Unknown", id };
+      });
+  })();
 
   const createdByName = (task as any).created_by_name ?? "Unknown";
 
@@ -271,7 +329,9 @@ export function TaskDetails({
               <CardTitle>Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-700">{task.description ?? "—"}</p>
+              <div className="text-gray-700">
+                <Linkify text={task.description ?? "—"} />
+              </div>
             </CardContent>
           </Card>
 
@@ -298,61 +358,182 @@ export function TaskDetails({
             </Card>
           )}
 
-          {/* Comments */}
+          {/* Discussions (Chat Style) */}
           <Card>
             <CardHeader>
-              <CardTitle>Comments</CardTitle>
+              <CardTitle>Discussions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-4">
-                {task.comments?.length ? task.comments.map((comment: any) => (
-                  <div key={comment.id} className="flex gap-3">
-                    <Avatar><AvatarFallback>{(comment.userName || "U").split(" ").map((n: string) => n[0]).join("")}</AvatarFallback></Avatar>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{comment.userName}</span>
-                        <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleString()}</span>
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                {discussions.length > 0 ? (
+                  discussions.map((disc) => {
+                    const isMe = disc.user_id === currentUser.id; // Note: user_id is Employee ID, currentUser.id is User ID. They should align if logic is correct, otherwise might be mismatch.
+                    // Ideally we compare against currentUser.employeeId or if currentUser IS employee. 
+                    // Assuming currentUser.id is the correct ID to match.
+
+                    return (
+                      <div key={disc.id} className={`flex gap-3 ${isMe ? "flex-row-reverse" : ""}`}>
+                        <Avatar className="h-8 w-8 mt-1">
+                          <AvatarFallback>{(disc.user?.name || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className={`flex flex-col max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-gray-600">{disc.user?.name || "Unknown"}</span>
+                            <span className="text-[10px] text-gray-400">{new Date(disc.createdAt).toLocaleString()}</span>
+                          </div>
+                          <div className={`p-3 rounded-lg text-sm ${isMe ? "bg-blue-600 text-white rounded-tr-none" : "bg-gray-100 text-gray-900 rounded-tl-none"}`}>
+                            {disc.message && <div className="whitespace-pre-wrap"><Linkify text={disc.message} /></div>}
+
+                            {disc.attachments && Array.isArray(disc.attachments) && disc.attachments.length > 0 && (
+                              <div className={`mt-2 p-2 rounded bg-white/10 ${isMe ? "border-white/20" : "border-gray-200 bg-white"}`}>
+                                {disc.attachments.map((att: any, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Paperclip className={`h-3 w-3 ${isMe ? "text-white/70" : "text-gray-500"}`} />
+                                    <a
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`text-xs hover:underline ${isMe ? "text-white" : "text-blue-600"}`}
+                                    >
+                                      {att.name}
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-700">{comment.content}</p>
-                    </div>
-                  </div>
-                )) : <p className="text-sm text-gray-500">No comments yet</p>}
+                    );
+                  })
+                ) : (
+                  <div className="text-center text-gray-500 py-4 text-sm">No discussions yet. Start the conversation!</div>
+                )}
               </div>
 
               <Separator />
 
-              {/* New Comment (UI only) */}
-              <div className="space-y-2">
-                <Textarea placeholder="Add a comment... (Use @name to mention someone)" value={newComment} onChange={(e) => setNewComment(e.target.value)} rows={3} />
-                <div className="flex justify-end">
-                  <Button onClick={() => setNewComment("")}><MessageSquare className="mr-2 h-4 w-4" />Add Comment</Button>
+              {/* New Message Input */}
+              <div className="space-y-3">
+                <Textarea
+                  placeholder="Type your message..."
+                  value={discussionMessage}
+                  onChange={(e) => setDiscussionMessage(e.target.value)}
+                  rows={2}
+                  className="min-h-[80px]"
+                />
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="disc-file-upload" className="cursor-pointer flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 border rounded px-2 py-1">
+                      <Paperclip className="h-3 w-3" />
+                      {discussionFile ? discussionFile.name : "Attach File"}
+                    </label>
+                    <input
+                      id="disc-file-upload"
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => setDiscussionFile(e.target.files?.[0] || null)}
+                    />
+                    {discussionFile && (
+                      <button onClick={() => setDiscussionFile(null)} className="text-gray-500 hover:text-red-500">
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!discussionMessage.trim() && !discussionFile) return;
+                      setSendingDiscussion(true);
+                      try {
+                        const payload = new FormData();
+                        if (discussionMessage) payload.append("message", discussionMessage);
+                        if (discussionFile) payload.append("document", discussionFile);
+
+                        await addTaskDiscussionApi(task.id, payload);
+
+                        // Refresh discussions
+                        const res = await getTaskDiscussionsApi(task.id);
+                        setDiscussions(res.data);
+
+                        setDiscussionMessage("");
+                        setDiscussionFile(null);
+                      } catch (err) {
+                        console.error("Failed to send", err);
+                        alert("Failed to send message");
+                      } finally {
+                        setSendingDiscussion(false);
+                      }
+                    }}
+                    disabled={sendingDiscussion || (!discussionMessage.trim() && !discussionFile)}
+                  >
+                    {sendingDiscussion ? "Sending..." : "Send"}
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Attachments */}
-          {task.attachments && task.attachments.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Attachments</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {task.attachments.map((attachment: any) => (
-                    <div key={attachment.id} className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="flex items-center gap-3">
-                        <Paperclip className="h-4 w-4 text-gray-500" />
-                        <div>
-                          <p className="text-sm">{attachment.name}</p>
-                          <p className="text-xs text-gray-500">Uploaded by {attachment.uploadedBy} on {new Date(attachment.uploadedAt).toLocaleDateString()}</p>
+          <Card>
+            <CardHeader><CardTitle>Attachments</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {task.attachments && Array.isArray(task.attachments) && task.attachments.length > 0 && (
+                  <div className="space-y-2">
+                    {task.attachments.map((attachment: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="flex items-center gap-3">
+                          <Paperclip className="h-4 w-4 text-gray-500" />
+                          <div>
+                            <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:underline text-blue-600">
+                              {attachment.name}
+                            </a>
+                            <p className="text-xs text-gray-500">Uploaded by {attachment.uploaded_by_name || "User"} {attachment.uploadedAt ? `on ${new Date(attachment.uploadedAt).toLocaleDateString()}` : ""}</p>
+                          </div>
                         </div>
+                        {/* <Button variant="ghost" size="sm">Download</Button> */}
                       </div>
-                      <Button variant="ghost" size="sm">Download</Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Attachment */}
+                {(currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Project Lead") && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      className="text-sm"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        try {
+                          const formData = new FormData();
+                          formData.append("document", file);
+
+                          // We need to send some update data to satisfy validation if any, 
+                          // but schema allows optional updates. 
+                          // Ideally, backend should handle just file update if schema allows all optional.
+                          // The updateTaskSchema allows optional everywhere.
+
+                          // Optimistic update? No, let's wait for server.
+                          await updateTaskApi(task.id, formData);
+                          fetchTask(true); // refresh
+                          alert("Attachment uploaded");
+                        } catch (err: any) {
+                          console.error("Upload failed", err);
+                          alert("Failed to upload attachment");
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Sidebar */}
@@ -488,7 +669,7 @@ export function TaskDetails({
             <CardContent className="space-y-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-sm text-gray-600"><Calendar className="h-4 w-4" /><span>Due Date</span></div>
-                <p className="text-sm">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}</p>
+                <p className="text-sm">{task.dueDate ? new Date(task.dueDate).toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "No due date"}</p>
               </div>
 
               <Separator />
@@ -496,10 +677,18 @@ export function TaskDetails({
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-sm text-gray-600"><User className="h-4 w-4" /><span>Assigned To</span></div>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6"><AvatarFallback>{(assignedUserName || "U").split(" ").map((n) => n[0]).join("")}</AvatarFallback></Avatar>
-                    <span className="text-sm">{assignedUserName}</span>
-                  </div>
+                  {assignedUsers.length > 0 ? (
+                    assignedUsers.map((u, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                           <AvatarFallback>{(u.name || "U").substring(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{u.name}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500">Unassigned</span>
+                  )}
                 </div>
               </div>
 

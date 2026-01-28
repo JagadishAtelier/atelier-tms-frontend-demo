@@ -20,7 +20,9 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { Plus, Search, Calendar as CalendarIcon, User, Clock } from "lucide-react";
+import { Plus, Search, Calendar as CalendarIcon, User, Clock, Loader2 } from "lucide-react";
+import { MultiSelect } from "./ui/multi-select";
+import { useRef, useCallback } from "react";
 
 import type {
   Task as TaskType,
@@ -40,6 +42,7 @@ import {
 } from "./service/task";
 import { getProjectsApi, type Project } from "./service/projectService";
 import { getEmployeesApi, type Employee } from "./service/employeeService";
+import { DateTimePicker } from "./ui/date-time-picker";
 
 interface TaskBoardProps {
   tasks: TaskType[]; // initial prop fallback (optional)
@@ -67,6 +70,22 @@ export function TaskBoard({
   const [projects, setProjects] = useState<Project[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observer = useRef<IntersectionObserver | null>(null);
+
+  const lastTaskElementRef = useCallback((node: HTMLDivElement) => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage((prevPage) => prevPage + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore]);
+
   // Create task form state
   const [createForm, setCreateForm] = useState({
     title: "",
@@ -76,11 +95,65 @@ export function TaskBoard({
     department: "",
     projectId: "", // Store project ID
     projectName: "", // Store project name for display
-    assignedTo: "", // Store single employee ID
+    assignedTo: [] as string[], // Store employee IDs
     status: "Not Started" as TaskStatus, // backend-aligned
   });
 
-  // current employee id from local user (if present)
+  const [createFile, setCreateFile] = useState<File | null>(null);
+
+  // ...
+
+  // ========== Create task handler ==========
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.title || !createForm.projectId || createForm.assignedTo.length === 0) {
+      alert("Please fill in Title, Project and Assigned To");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = new FormData();
+      payload.append("title", createForm.title.trim());
+      if (createForm.description) payload.append("description", createForm.description.trim());
+      payload.append("priority", createForm.priority);
+      if (createForm.dueDate) payload.append("due_date_and_time", new Date(createForm.dueDate).toISOString());
+      payload.append("project_id", createForm.projectId);
+      payload.append("assigned_to", JSON.stringify(createForm.assignedTo));
+      payload.append("status", createForm.status ?? "Not Started");
+      payload.append("is_active", "true");
+
+      if (createFile) {
+        payload.append("document", createFile);
+      }
+
+      await createTaskApi(payload);
+      setIsCreateDialogOpen(false);
+      setCreateForm({
+        title: "",
+        description: "",
+        priority: "Medium",
+        dueDate: "",
+        department: "",
+        projectId: "",
+        projectName: "",
+        assignedTo: [],
+        status: "Not Started",
+      });
+      setCreateFile(null);
+      await fetchTasks();
+    } catch (err: any) {
+      console.error("Failed to create task:", err);
+      const msg = err?.response?.data?.message || err?.message || "Failed to create task";
+      alert(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ...
+
+
   const storedUser = (() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "{}");
@@ -91,11 +164,27 @@ export function TaskBoard({
   const currentEmployeeId = storedUser?.employee_profile?.id || "";
 
   // ========== Effects ==========
+  // ========== Effects ==========
   useEffect(() => {
-    fetchTasks();
     fetchProjects();
     fetchEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch tasks when filters or page change
+  useEffect(() => {
+    // If page is 1, it's a reset/filter change
+    const isReset = page === 1;
+    fetchTasks(isReset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, searchTerm, statusFilter, priorityFilter, departmentFilter]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter, priorityFilter, departmentFilter]);
 
   // ========== API helpers / robust parsing ==========
   function extractData<T = any>(res: any): T {
@@ -116,12 +205,29 @@ export function TaskBoard({
   }
 
   // ========== Fetchers ==========
-  async function fetchTasks() {
+  // ========== Fetchers ==========
+  async function fetchTasks(reset = false) {
+    if (loading && !reset && page > 1) return; // Prevent duplicate fetch if already loading more
+
     setLoading(true);
     try {
-      const res = await getTasksApi();
+      const params: any = {
+        page: reset ? 1 : page,
+        limit: 10,
+      };
+
+      if (searchTerm) params.search = searchTerm;
+      if (statusFilter !== "All") params.status = statusFilter;
+      if (priorityFilter !== "All") params.priority = priorityFilter;
+
+      // Role filtering for API
+      if (currentUser?.role === "employee") {
+        params.assigned_to = currentEmployeeId;
+      }
+
+      const res = await getTasksApi(params);
       const data = extractData<any>(res);
-      // data may be array or object with pagination: { total, currentPage, data: [...] }
+
       let tasksArray: any[] = [];
       if (Array.isArray(data)) tasksArray = data;
       else if (data?.data && Array.isArray(data.data)) tasksArray = data.data;
@@ -129,10 +235,22 @@ export function TaskBoard({
       else tasksArray = [];
 
       const mappedTasks: TaskType[] = tasksArray.map((t: any) => mapApiTaskToFrontend(t));
-      setLocalTasks(mappedTasks);
+
+      if (reset) {
+        setLocalTasks(mappedTasks);
+      } else {
+        setLocalTasks((prev) => {
+          // Filter duplicates just in case
+          const newIds = new Set(mappedTasks.map(t => t.id));
+          return [...prev.filter(t => !newIds.has(t.id)), ...mappedTasks];
+        });
+      }
+
+      setHasMore(mappedTasks.length >= 10);
     } catch (err) {
       console.error("Failed to fetch tasks:", err);
-      setLocalTasks([]);
+      // Don't clear tasks on error if loading more
+      if (reset) setLocalTasks([]);
     } finally {
       setLoading(false);
     }
@@ -188,11 +306,11 @@ export function TaskBoard({
     const status: TaskStatus = (task.status as TaskStatus) ?? "Not Started";
     const priority: TaskPriority = (task.priority as TaskPriority) ?? "Medium";
 
-    const assignedToId: string =
-      task.assigned_to ??
-      task.assignee?.id ??
-      task.assignedTo ??
-      ""; // fallback variations
+    // multiple assignees logic
+    let assignedIds: string[] = [];
+    if (Array.isArray(task.assigned_to)) assignedIds = task.assigned_to;
+    else if (task.assigned_to) assignedIds = [task.assigned_to];
+    else if (task.assignee?.id) assignedIds = [task.assignee.id]; // fallback
 
     // Use assignee relation name if available
     const projectName = task.project?.name ?? task.project_name ?? task.project_id ?? "";
@@ -205,8 +323,8 @@ export function TaskBoard({
       description: task.description ?? "",
       status,
       priority,
-      // adapt to TaskType shape (assignedTo single string)
-      assignedTo: assignedToId,
+      // adapt to TaskType shape 
+      assignedTo: assignedIds,
       assignedBy: task.created_by ?? task.createdBy ?? currentUser?.id,
       createdAt: task.createdAt ?? task.created_at ?? new Date().toISOString(),
       dueDate: task.due_date_and_time ?? task.dueDate ?? null,
@@ -264,8 +382,9 @@ export function TaskBoard({
       // otherwise allow
     } else {
       // normal user: must be assigned to them
-      if (!task.assignedTo) return false;
-      if (String(task.assignedTo) !== String(currentEmployeeId)) return false;
+      if (!task.assignedTo || task.assignedTo.length === 0) return false;
+      const ids = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
+      if (!ids.includes(String(currentEmployeeId))) return false;
     }
 
     // search
@@ -302,60 +421,20 @@ export function TaskBoard({
   };
 
   const getAssignedUserName = (assignedTo: string | string[] | undefined) => {
-    const id = Array.isArray(assignedTo) ? assignedTo[0] : assignedTo;
-    if (!id) return "Unassigned";
-    const emp = employees.find((e) => String(e.id) === String(id));
-    if (emp) return emp.name ?? emp.email ?? "Unknown";
-    const user = users.find((u) => String(u.id) === String(id));
-    if (user) return user.username ?? user.email ?? "Unknown";
-    return "Unknown";
+    const ids = Array.isArray(assignedTo) ? assignedTo : (assignedTo ? [assignedTo] : []);
+    if (ids.length === 0) return "Unassigned";
+
+    const names = ids.map(id => {
+      const emp = employees.find((e) => String(e.id) === String(id));
+      if (emp) return emp.name ?? emp.email ?? "Unknown";
+      const user = users.find((u) => String(u.id) === String(id));
+      return user?.username ?? user?.email ?? "Unknown";
+    });
+
+    return names.join(", ");
   };
 
-  // ========== Create task handler ==========
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createForm.title || !createForm.projectId || !createForm.assignedTo) {
-      alert("Please fill in Title, Project and Assigned To");
-      return;
-    }
 
-    setLoading(true);
-    try {
-      const payload: TaskPayload = {
-        title: createForm.title.trim(),
-        description: createForm.description?.trim() || undefined,
-        priority: createForm.priority,
-        due_date_and_time: createForm.dueDate ? new Date(createForm.dueDate).toISOString() : undefined,
-        project_id: createForm.projectId,
-        assigned_to: createForm.assignedTo,
-        status: createForm.status ?? "Not Started",
-        is_active: true,
-      };
-
-      await createTaskApi(payload);
-      setIsCreateDialogOpen(false);
-      setCreateForm({
-        title: "",
-        description: "",
-        priority: "Medium",
-        dueDate: "",
-        department: "",
-        projectId: "",
-        projectName: "",
-        assignedTo: "",
-        status: "Not Started",
-      });
-      await fetchTasks();
-    } catch (err: any) {
-      console.error("Failed to create task:", err);
-      const msg = err?.response?.data?.message || err?.message || "Failed to create task";
-      alert(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ========== Status update handler ==========
   const handleStatusUpdate = async (taskId: string, newStatus: TaskStatus) => {
     setLoading(true);
     try {
@@ -500,13 +579,20 @@ export function TaskBoard({
 
                   <div className="space-y-2">
                     <Label htmlFor="task-due-date">Due Date</Label>
-                    <Input
-                      id="task-due-date"
-                      type="date"
-                      value={createForm.dueDate}
-                      onChange={(e) => setCreateForm({ ...createForm, dueDate: e.target.value })}
+                    <DateTimePicker
+                      date={createForm.dueDate ? new Date(createForm.dueDate) : undefined}
+                      setDate={(date) => setCreateForm({ ...createForm, dueDate: date ? date.toISOString() : "" })}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="task-file">Attachment</Label>
+                  <Input
+                    id="task-file"
+                    type="file"
+                    onChange={(e) => setCreateFile(e.target.files?.[0] || null)}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -531,28 +617,17 @@ export function TaskBoard({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="task-assigned">Assign To *</Label>
-                    <Select
+                    <Label htmlFor="task-project">Assigned To *</Label>
+                    <MultiSelect
+                      variant="inverted"
+                      options={employees.length > 0
+                        ? employees.map(emp => ({ label: emp.name ?? emp.email, value: emp.id }))
+                        : users.filter(u => u.role !== "Client").map(u => ({ label: u.username, value: u.id }))}
                       value={createForm.assignedTo}
-                      onValueChange={(value) => setCreateForm({ ...createForm, assignedTo: value })}
-                    >
-                      <SelectTrigger id="task-assigned">
-                        <SelectValue placeholder="Select employee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {employees.length > 0 ? (
-                          employees.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.name ?? emp.email}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          users.filter((u) => u.role !== "Client").map((user) => (
-                            <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                      onValueChange={(vals) => setCreateForm({ ...createForm, assignedTo: vals })}
+                      placeholder="Select employees"
+                      maxCount={3}
+                    />
                   </div>
                 </div>
 
@@ -570,7 +645,7 @@ export function TaskBoard({
                         department: "",
                         projectId: "",
                         projectName: "",
-                        assignedTo: "",
+                        assignedTo: [],
                         status: "Not Started",
                       });
                     }}
@@ -660,8 +735,8 @@ export function TaskBoard({
             const columnTasks = getTasksByStatus(status);
             return (
               <div key={status} className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm">{status}</h3>
+                <div className="flex items-center justify-between sticky -top-6 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 border-b">
+                  <h3 className="text-sm font-semibold">{status}</h3>
                   <Badge variant="secondary">{columnTasks.length}</Badge>
                 </div>
                 <div className="space-y-3">
@@ -680,6 +755,11 @@ export function TaskBoard({
           ))}
         </div>
       )}
+
+      {/* Sentinel for Infinite Scroll */}
+      <div ref={lastTaskElementRef} className="h-4 flex items-center justify-center py-4">
+        {loading && tasksToUse.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+      </div>
     </div>
   );
 }

@@ -3,9 +3,10 @@ import axios from "axios";
 // ===============================
 // Task Enums (MATCH BACKEND)
 // ===============================
-export type TaskPriority = "Low" | "Medium" | "High";
+export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
 export type TaskStatus =
+  | "To Do"
   | "Not Started"
   | "In Progress"
   | "Completed"
@@ -50,7 +51,25 @@ export interface Task extends TaskPayload {
   updated_by?: string;
   updated_by_name?: string;
   updated_by_email?: string;
+
+  attachments?: { name: string; url: string; type: string; key?: string }[];
 }
+
+export interface TaskDiscussion {
+  id: string;
+  task_id: string;
+  user_id: string;
+  message: string;
+  attachments?: { name: string; url: string; type: string; key?: string }[];
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    image_url?: string;
+  };
+}
+
 
 // ===============================
 // API Response Wrapper
@@ -65,7 +84,7 @@ export interface ApiResponse<T> {
 // Axios Instance
 // ===============================
 const API = axios.create({
-  baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/task/task",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/tms/task/task`,
 });
 
 // Attach token
@@ -77,13 +96,28 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+const DiscussAPI = axios.create({
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/tms/discussion`,
+});
+DiscussAPI.interceptors.request.use((config) => {
+  const token = localStorage.getItem("accessToken");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+
 // ===============================
 // API Calls
 // ===============================
 
 // Create Task
-export const createTaskApi = (data: TaskPayload) =>
-  API.post<ApiResponse<Task>>("/", data);
+export const createTaskApi = (data: TaskPayload | FormData) => {
+  const isFormData = data instanceof FormData;
+  const headers = isFormData ? { "Content-Type": "multipart/form-data" } : undefined;
+  return API.post<ApiResponse<Task>>("/", data, { headers });
+}
 
 // Get all tasks
 export const getTasksApi = (params?: Record<string, any>) =>
@@ -96,9 +130,12 @@ export const getTaskByIdApi = (id: string) =>
 // Update task
 export const updateTaskApi = (
   id: string,
-  data: Partial<TaskPayload>
-) =>
-  API.put<ApiResponse<Task>>(`/${id}`, data);
+  data: Partial<TaskPayload> | FormData
+) => {
+  const isFormData = data instanceof FormData;
+  const headers = isFormData ? { "Content-Type": "multipart/form-data" } : undefined;
+  return API.put<ApiResponse<Task>>(`/${id}`, data, { headers });
+}
 
 // Delete task (soft delete)
 export const deleteTaskApi = (id: string) =>
@@ -115,3 +152,19 @@ export const getTaskByProjectApi = (projectId: string) =>
 // Logged-in employee tasks
 export const getMyTasksApi = () =>
   API.get<ApiResponse<Task[]>>(`/employee/me`);
+
+// =================
+// Discussions
+// =================
+export const getTaskDiscussionsApi = (taskId: string) =>
+  DiscussAPI.get<ApiResponse<TaskDiscussion[]>>(`/${taskId}`);
+
+export const addTaskDiscussionApi = (taskId: string, data: { message: string } | FormData) => {
+  const isFormData = data instanceof FormData;
+  const headers = isFormData ? { "Content-Type": "multipart/form-data" } : undefined;
+  // Route is POST /:taskId
+  return DiscussAPI.post<ApiResponse<TaskDiscussion>>(`/${taskId}`, data, { headers });
+};
+
+export const deleteTaskDiscussionApi = (id: string) =>
+  DiscussAPI.delete<ApiResponse<null>>(`/${id}`);

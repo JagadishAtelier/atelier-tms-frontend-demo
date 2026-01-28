@@ -45,7 +45,7 @@ export interface Attendance {
  */
 export type CreateAttendancePayload = {
   employee_id?: string;
-  date: string; 
+  date: string;
   action?: "check_in" | "check_out" | "sign_in" | "sign_out";
   time?: string;
   check_in?: string;
@@ -90,7 +90,7 @@ export type GetAttendancesParams = {
  * Axios instance
  */
 const API = axios.create({
-  baseURL: "https://tms-be-kst3.onrender.com/api/v1/tms/employee",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/tms/employee`,
 });
 
 /**
