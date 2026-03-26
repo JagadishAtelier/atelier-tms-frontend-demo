@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push Notification Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔔 Push Notification Diagnostic Tool</h1>
+
+        <div class="section">
+            <h2>1. Service Worker Status</h2>
+            <div id="sw-status"></div>
+            <button onclick="checkServiceWorker()">Check Service Worker</button>
+        </div>
+
+        <div class="section">
+            <h2>2. Notification Permission</h2>
+            <div id="permission-status"></div>
+            <button onclick="requestPermission()">Request Permission</button>
+        </div>
+
+        <div class="section">
+            <h2>3. Push Subscription</h2>
+            <div id="subscription-status"></div>
+            <button onclick="checkSubscription()">Check Subscription</button>
+            <button onclick="subscribe()">Subscribe</button>
+            <button onclick="unsubscribe()">Unsubscribe</button>
+        </div>
+
+        <div class="section">
+            <h2>4. Test Push Notification</h2>
+            <input type="text" id="token" placeholder="Enter your auth token"
+                style="width: 100%; padding: 8px; margin: 10px 0;">
+            <button onclick="testPush()">Send Test Notification</button>
+            <div id="test-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>5. Logs</h2>
+            <pre id="logs"></pre>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://tms-be-kst3.onrender.com/api/v1/tms';
+        let logs = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push(`[${timestamp}] ${message}`);
+            document.getElementById('logs').textContent = logs.join('\n');
+            console.log(message);
+        }
+
+        function clearLogs() {
+            logs = [];
+            document.getElementById('logs').textContent = '';
+        }
+
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function checkServiceWorker() {
+            log('Checking service worker...');
+
+            if (!('serviceWorker' in navigator)) {
+                showStatus('sw-status', '❌ Service Worker not supported in this browser', 'error');
+                log('ERROR: Service Worker not supported');
+                return;
+            }
+
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    showStatus('sw-status', `✅ Service Worker registered at: ${registration.active?.scriptURL}`, 'success');
+                    log(`Service Worker registered: ${registration.active?.scriptURL}`);
+                } else {
+                    showStatus('sw-status', '⚠️ Service Worker not registered. Registering now...', 'warning');
+                    const reg = await navigator.serviceWorker.register('/sw.js');
+                    showStatus('sw-status', `✅ Service Worker registered successfully`, 'success');
+                    log('Service Worker registered successfully');
+                }
+            } catch (error) {
+                showStatus('sw-status', `❌ Error: ${error.message}`, 'error');
+                log(`ERROR: ${error.message}`);
+            }
+        }
+
+        async function requestPermission() {
+            log('Requesting notification permission...');
+
+            if (!('Notification' in window)) {
+                showStatus('permission-status', '❌ Notifications not supported', 'error');
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+
+            if (permission === 'granted') {
+                showStatus('permission-status', '✅ Permission granted', 'success');
+                log('Permission granted');
+            } else if (permission === 'denied') {
+                showStatus('permission-status', '❌ Permission denied. Please reset in browser settings.', 'error');
+                log('Permission denied');
+            } else {
+                showStatus('permission-status', '⚠️ Permission dismissed', 'warning');
+                log('Permission dismissed');
+            }
+        }
+
+        async function checkSubscription() {
+            log('Checking push subscription...');
+
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+
+                if (subscription) {
+                    const json = subscription.toJSON();
+                    showStatus('subscription-status',
+                        `✅ Active subscription<br>
+            Endpoint: ${subscription.endpoint.substring(0, 60)}...<br>
+            Keys: p256dh=${json.keys.p256dh.substring(0, 20)}..., auth=${json.keys.auth.substring(0, 20)}...`,
+                        'success'
+                    );
+                    log(`Active subscription: ${subscription.endpoint}`);
+                } else {
+                    showStatus('subscription-status', '⚠️ No active subscription', 'warning');
+                    log('No active subscription found');
+                }
+            } catch (error) {
+                showStatus('subscription-status', `❌ Error: ${error.message}`, 'error');
+                log(`ERROR: ${error.message}`);
+            }
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function subscribe() {
+            log('Starting subscription process...');
+
+            try {
+                // Get VAPID key from backend
+                log('Fetching VAPID public key...');
+                const response = await fetch(`${API_URL}/notifications/push/public-key`);
+                const data = await response.json();
+                const publicKey = data.data.publicKey;
+                log(`VAPID key received: ${publicKey.substring(0, 20)}...`);
+
+                // Subscribe
+                const registration = await navigator.serviceWorker.ready;
+                const convertedKey = urlBase64ToUint8Array(publicKey);
+
+                log('Calling pushManager.subscribe...');
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedKey
+                });
+
+                log(`Subscription created: ${subscription.endpoint}`);
+
+                // Send to backend
+                const token = document.getElementById('token').value;
+                if (!token) {
+                    showStatus('subscription-status', '⚠️ Please enter auth token to save subscription', 'warning');
+                    log('WARNING: No auth token provided');
+                    return;
+                }
+
+                log('Sending subscription to backend...');
+                const saveResponse = await fetch(`${API_URL}/notifications/push/subscribe`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ subscription: subscription.toJSON() })
+                });
+
+                if (saveResponse.ok) {
+                    showStatus('subscription-status', '✅ Successfully subscribed!', 'success');
+                    log('✅ Subscription saved to backend');
+                } else {
+                    const error = await saveResponse.text();
+                    showStatus('subscription-status', `❌ Failed to save: ${error}`, 'error');
+                    log(`ERROR: Failed to save subscription: ${error}`);
+                }
+            } catch (error) {
+                showStatus('subscription-status', `❌ Error: ${error.message}`, 'error');
+                log(`ERROR: ${error.message}`);
+            }
+        }
+
+        async function unsubscribe() {
+            log('Unsubscribing...');
+
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+
+                if (subscription) {
+                    await subscription.unsubscribe();
+                    showStatus('subscription-status', '✅ Unsubscribed successfully', 'success');
+                    log('Unsubscribed successfully');
+                } else {
+                    showStatus('subscription-status', '⚠️ No subscription to unsubscribe', 'warning');
+                    log('No subscription found');
+                }
+            } catch (error) {
+                showStatus('subscription-status', `❌ Error: ${error.message}`, 'error');
+                log(`ERROR: ${error.message}`);
+            }
+        }
+
+        async function testPush() {
+            log('Sending test push notification...');
+
+            const token = document.getElementById('token').value;
+            if (!token) {
+                showStatus('test-result', '❌ Please enter auth token', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/notifications/push/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title: 'Test Notification',
+                        message: 'This is a test push notification from the diagnostic tool'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.data.sent > 0) {
+                    showStatus('test-result',
+                        `✅ Success!<br>Sent: ${result.data.sent}, Failed: ${result.data.failed}, Total: ${result.data.total}`,
+                        'success'
+                    );
+                    log(`✅ Test notification sent: ${JSON.stringify(result.data)}`);
+                } else {
+                    showStatus('test-result',
+                        `⚠️ Failed to send<br>Sent: ${result.data.sent}, Failed: ${result.data.failed}, Total: ${result.data.total}<br>Check backend logs for details`,
+                        'warning'
+                    );
+                    log(`WARNING: No notifications sent: ${JSON.stringify(result.data)}`);
+                }
+            } catch (error) {
+                showStatus('test-result', `❌ Error: ${error.message}`, 'error');
+                log(`ERROR: ${error.message}`);
+            }
+        }
+
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            log('Page loaded, running initial checks...');
+            checkServiceWorker();
+
+            if ('Notification' in window) {
+                const permission = Notification.permission;
+                showStatus('permission-status',
+                    `Current permission: ${permission}<br>` +
+                    (permission === 'granted' ? '✅ Granted' :
+                        permission === 'denied' ? '❌ Denied - Reset in browser settings' :
+                            '⚠️ Not requested yet'),
+                    permission === 'granted' ? 'success' : permission === 'denied' ? 'error' : 'warning'
+                );
+                log(`Notification permission: ${permission}`);
+            }
+
+            checkSubscription();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#4F46E5"/>
+  <path d="M96 48c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16s16-7.2 16-16V64c0-8.8-7.2-16-16-16zm0 80c-8.8 0-16 7.2-16 16s7.2 16 16 16 16-7.2 16-16-7.2-16-16-16z" fill="white"/>
+  <text x="96" y="170" font-family="Arial, sans-serif" font-size="24" fill="white" text-anchor="middle" font-weight="bold">TMS</text>
+</svg>
